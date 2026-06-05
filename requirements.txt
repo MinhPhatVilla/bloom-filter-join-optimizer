@@ -1,0 +1,25 @@
+# ===========================================
+# Dependencies cho Bloom Filter Join Optimizer
+# ===========================================
+
+# MurmurHash3 - Hàm băm nhanh, phân bố đều
+# Dùng làm hash function cho Bloom Filter
+mmh3==4.1.0
+
+# Bit Array - Mảng bit hiệu quả về bộ nhớ
+# Dùng làm cấu trúc lưu trữ chính của Bloom Filter
+bitarray==2.9.2
+
+# Matplotlib - Vẽ biểu đồ
+# Dùng để trực quan hoá FPR, bandwidth savings
+matplotlib==3.8.3
+
+# NumPy - Tính toán số học
+numpy==1.26.4
+
+# Pandas - Xử lý dữ liệu dạng bảng
+# Dùng để tạo và quản lý Subscribers, WebLogs
+pandas==2.2.1
+
+# Tabulate - Hiển thị bảng đẹp trong terminal
+tabulate==0.9.0

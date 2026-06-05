@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bloom Filter Join Optimizer — Dashboard</title>
+  <meta name="description" content="Dashboard trực quan - Bloom Filter Semi-Join Optimizer - CSDL Phân Tán">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+
+  <!-- ═══ NAVBAR ═══ -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-container">
+      <a href="#" class="nav-logo" onclick="switchTab('hero'); return false;">
+        <span class="nav-logo-hex">⬡</span>
+        <span class="nav-logo-text">BF <span class="nav-logo-accent">Optimizer</span></span>
+      </a>
+      <ul class="nav-links" id="nav-links">
+        <li><a href="#" class="nav-link" data-tab="pipeline"  onclick="switchTab('pipeline');  return false;">Pipeline</a></li>
+        <li><a href="#" class="nav-link" data-tab="controls"  onclick="switchTab('controls');  return false;">Mô Phỏng</a></li>
+        <li><a href="#" class="nav-link" data-tab="dashboard" onclick="switchTab('dashboard'); return false;">Dashboard</a></li>
+        <li><a href="#" class="nav-link" data-tab="results"   onclick="switchTab('results');   return false;">Kết Quả</a></li>
+        <li><a href="#" class="nav-link" data-tab="theory"    onclick="switchTab('theory');    return false;">Lý Thuyết</a></li>
+      </ul>
+      <button class="btn btn-primary btn-sm nav-cta" id="nav-cta-btn" onclick="runSimulation()">
+        <span class="nav-cta-pulse"></span>
+        ▶ Chạy Demo
+      </button>
+      <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu" onclick="toggleMobileMenu()">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ═══ HERO TAB ═══ -->
+  <div class="tab-page active" data-tab-id="hero">
+  <header id="hero" class="hero">
+    <div class="hero-particles" id="hero-particles"></div>
+    <div class="hero-glow glow-1"></div>
+    <div class="hero-glow glow-2"></div>
+
+    <div class="hero-content">
+      <div class="hero-badge" data-animate="fade-down">
+        <span class="badge-pulse"></span>
+        <span>CSDL Phân Tán &nbsp;·&nbsp; Đề Tài #15</span>
+      </div>
+
+      <h1 class="hero-title" data-animate="fade-up" data-delay="100">
+        <span class="gradient-text">Bloom Filter</span><br>
+        <span>Semi-Join Optimizer</span>
+      </h1>
+
+      <p class="hero-subtitle" data-animate="fade-up" data-delay="200">
+        Tối ưu JOIN phân tán — tiết kiệm tới <strong class="text-green">~80% băng thông mạng</strong>
+      </p>
+
+      <div class="hero-actions" data-animate="fade-up" data-delay="300">
+        <button id="btn-run-demo" class="btn btn-primary btn-lg" onclick="runSimulation()">
+          <span class="btn-shine"></span>
+          <span>▶</span> Chạy Demo
+        </button>
+        <a href="#" class="btn btn-outline btn-lg" onclick="switchTab('pipeline'); return false;">Xem Pipeline →</a>
+      </div>
+
+      <div class="hero-stats" id="hero-stats" data-animate="fade-up" data-delay="400">
+        <div class="stat-card">
+          <div class="stat-icon-css stat-icon-purple"></div>
+          <span class="stat-value" id="stat-subscribers">10,000</span>
+          <span class="stat-label">Subscribers</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon-css stat-icon-cyan"></div>
+          <span class="stat-value" id="stat-logs">100,000</span>
+          <span class="stat-label">WebLogs</span>
+        </div>
+        <div class="stat-card stat-highlight">
+          <div class="stat-icon-css stat-icon-green"></div>
+          <span class="stat-value text-green" id="stat-saving">—</span>
+          <span class="stat-label">Bandwidth Saved</span>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon-css stat-icon-orange"></div>
+          <span class="stat-value" id="stat-time">—</span>
+          <span class="stat-label">Thời gian chạy</span>
+        </div>
+      </div>
+    </div>
+  </header>
+  </div>
+
+  <!-- ═══ PIPELINE TAB ═══ -->
+  <div class="tab-page" data-tab-id="pipeline">
+  <section id="pipeline" class="section">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Kiến Trúc</div>
+        <h2 class="section-title">Pipeline <span class="title-dot">·</span> Semi-Join</h2>
+        <p class="section-desc">Luồng thực thi 5 bước tối ưu hoá truy vấn JOIN phân tán</p>
+      </div>
+
+      <div class="pipeline-flow" id="pipeline-flow">
+        <!-- Step 1 -->
+        <div class="pipeline-step" data-step="1" data-animate="fade-up" data-delay="0">
+          <div class="step-number">1</div>
+          <div class="step-card glass-card">
+            <div class="step-icon step-icon--purple">
+              <span class="si-bit"></span><span class="si-bit"></span>
+              <span class="si-bit si-bit--on"></span><span class="si-bit"></span>
+              <span class="si-bit si-bit--on"></span><span class="si-bit si-bit--on"></span>
+            </div>
+            <h3>Site A: Tạo BF</h3>
+            <p>Tạo Bloom Filter từ toàn bộ UserIDs</p>
+            <div class="step-badge" id="step-badge-1"></div>
+          </div>
+        </div>
+
+        <div class="pipeline-connector" id="conn-1">
+          <div class="conn-track"><div class="conn-dot-travel"></div></div>
+          <div class="conn-label" id="conn-label-1">A → B</div>
+        </div>
+
+        <!-- Step 2 -->
+        <div class="pipeline-step" data-step="2" data-animate="fade-up" data-delay="80">
+          <div class="step-number">2</div>
+          <div class="step-card glass-card">
+            <div class="step-icon step-icon--cyan">
+              <span class="si-arrow"></span>
+            </div>
+            <h3>Gửi BF qua mạng</h3>
+            <p>Truyền bit-vector compact thay vì danh sách ID</p>
+            <div class="step-badge" id="step-badge-2"></div>
+          </div>
+        </div>
+
+        <div class="pipeline-connector" id="conn-2">
+          <div class="conn-track"><div class="conn-dot-travel"></div></div>
+          <div class="conn-label" id="conn-label-2">Lọc</div>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="pipeline-step" data-step="3" data-animate="fade-up" data-delay="160">
+          <div class="step-number">3</div>
+          <div class="step-card glass-card">
+            <div class="step-icon step-icon--orange">
+              <span class="si-funnel"></span>
+            </div>
+            <h3>Site B: Lọc Logs</h3>
+            <p>Loại bỏ ~80% guest logs ngay tại Site B</p>
+            <div class="step-badge" id="step-badge-3"></div>
+          </div>
+        </div>
+
+        <div class="pipeline-connector" id="conn-3">
+          <div class="conn-track"><div class="conn-dot-travel"></div></div>
+          <div class="conn-label" id="conn-label-3">B → A</div>
+        </div>
+
+        <!-- Step 4 -->
+        <div class="pipeline-step" data-step="4" data-animate="fade-up" data-delay="240">
+          <div class="step-number">4</div>
+          <div class="step-card glass-card">
+            <div class="step-icon step-icon--green">
+              <span class="si-package"></span>
+            </div>
+            <h3>Gửi Logs đã lọc</h3>
+            <p>Chỉ truyền ~20% logs cần thiết về Site A</p>
+            <div class="step-badge" id="step-badge-4"></div>
+          </div>
+        </div>
+
+        <div class="pipeline-connector" id="conn-4">
+          <div class="conn-track"><div class="conn-dot-travel"></div></div>
+          <div class="conn-label" id="conn-label-4">Join</div>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="pipeline-step" data-step="5" data-animate="fade-up" data-delay="320">
+          <div class="step-number">5</div>
+          <div class="step-card glass-card">
+            <div class="step-icon step-icon--teal">
+              <span class="si-check"></span>
+            </div>
+            <h3>Final Inner Join</h3>
+            <p>Inner Join cuối — loại bỏ False Positives tự động</p>
+            <div class="step-badge" id="step-badge-5"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ CONTROLS TAB ═══ -->
+  <div class="tab-page" data-tab-id="controls">
+  <section id="controls" class="section section-dark">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Tham Số</div>
+        <h2 class="section-title">Cấu Hình <span class="title-dot">·</span> Mô Phỏng</h2>
+        <p class="section-desc">Tuỳ chỉnh tham số đầu vào và chạy mô phỏng thực tế</p>
+      </div>
+      <div class="controls-grid">
+
+        <!-- Slider: Subscribers -->
+        <div class="control-card glass-card" data-animate="fade-up" data-delay="0">
+          <label class="control-label">
+            <span class="ctrl-dot ctrl-dot--purple"></span>
+            Subscribers <span class="ctrl-site">(Site A)</span>
+          </label>
+          <input type="range" id="slider-subs" class="slider slider--purple" min="1000" max="100000" value="10000" step="1000">
+          <div class="slider-range-hint"><span>1K</span><span>100K</span></div>
+          <div class="control-value"><span id="val-subs">10,000</span> <span class="unit">dòng</span></div>
+        </div>
+
+        <!-- Slider: WebLogs -->
+        <div class="control-card glass-card" data-animate="fade-up" data-delay="80">
+          <label class="control-label">
+            <span class="ctrl-dot ctrl-dot--cyan"></span>
+            WebLogs <span class="ctrl-site">(Site B)</span>
+          </label>
+          <input type="range" id="slider-logs" class="slider slider--cyan" min="5000" max="500000" value="50000" step="5000">
+          <div class="slider-range-hint"><span>5K</span><span>500K</span></div>
+          <div class="control-value"><span id="val-logs">50,000</span> <span class="unit">dòng</span></div>
+        </div>
+
+        <!-- Slider: Overlap -->
+        <div class="control-card glass-card" data-animate="fade-up" data-delay="160">
+          <label class="control-label">
+            <span class="ctrl-dot ctrl-dot--orange"></span>
+            Overlap Ratio
+          </label>
+          <input type="range" id="slider-overlap" class="slider slider--orange" min="5" max="90" value="20" step="5">
+          <div class="slider-range-hint"><span>5%</span><span>90%</span></div>
+          <div class="control-value"><span id="val-overlap">20</span><span class="unit">%</span></div>
+          <div class="control-hint-sub" id="overlap-hint">~80% guest logs (không phải subscriber)</div>
+        </div>
+
+        <!-- Action Card -->
+        <div class="control-card control-card--action glass-card control-btn-wrap" data-animate="fade-up" data-delay="240">
+          <div class="action-icon-wrap">
+            <div class="action-ring"></div>
+            <span class="action-bolt">⚡</span>
+          </div>
+          <button id="btn-simulate" class="btn btn-primary btn-lg" onclick="runSimulation()">
+            <span class="btn-shine"></span>
+            Chạy Mô Phỏng
+          </button>
+        </div>
+
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ LOADING ═══ -->
+  <div id="loading-overlay" class="loading-overlay loading-overlay--hidden">
+    <div class="loading-content glass-card">
+      <div class="loading-top">
+        <div class="loading-rings">
+          <div class="ring ring-1"></div>
+          <div class="ring ring-2"></div>
+          <div class="ring ring-3"></div>
+          <div class="ring-icon">⬡</div>
+        </div>
+        <h3>Đang chạy...</h3>
+        <p>Bloom Filter Semi-Join</p>
+      </div>
+      <ul class="loading-steps" id="loading-steps-list">
+        <li class="ls-item" id="ls-0"><span class="ls-dot"></span><span class="ls-text">Tạo dữ liệu Subscribers &amp; WebLogs</span></li>
+        <li class="ls-item" id="ls-1"><span class="ls-dot"></span><span class="ls-text">Xây dựng Bloom Filter tại Site A</span></li>
+        <li class="ls-item" id="ls-2"><span class="ls-dot"></span><span class="ls-text">Gửi bit-vector qua mạng → Site B</span></li>
+        <li class="ls-item" id="ls-3"><span class="ls-dot"></span><span class="ls-text">Lọc WebLogs &amp; gửi kết quả về Site A</span></li>
+        <li class="ls-item" id="ls-4"><span class="ls-dot"></span><span class="ls-text">Inner Join cuối — loại FP, xuất kết quả</span></li>
+      </ul>
+      <div class="loading-bar-wrap">
+        <div class="loading-bar-fill" id="loading-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ DASHBOARD TAB ═══ -->
+  <div class="tab-page" data-tab-id="dashboard">
+  <section id="dashboard" class="section">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Phân Tích</div>
+        <h2 class="section-title">Dashboard <span class="title-dot">·</span> Phân Tích</h2>
+        <p class="section-desc">Biểu đồ so sánh hiệu suất các chiến lược Join phân tán</p>
+      </div>
+
+      <div class="charts-grid" id="charts-section">
+        <!-- Chart 1: Bandwidth -->
+        <div class="chart-card glass-card" data-animate="fade-up" data-delay="0">
+          <div class="chart-header">
+            <h3><span class="chart-dot chart-dot--pink"></span>So Sánh Băng Thông</h3>
+            <span class="chart-tag chart-tag--pink">KB</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-bandwidth"></canvas></div>
+        </div>
+
+        <!-- Chart 2: FPR -->
+        <div class="chart-card glass-card" data-animate="fade-up" data-delay="80">
+          <div class="chart-header">
+            <h3><span class="chart-dot chart-dot--purple"></span>FPR Lý Thuyết vs Thực Tế</h3>
+            <span class="chart-tag chart-tag--purple">%</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-fpr"></canvas></div>
+        </div>
+
+        <!-- Chart 3: Overlap -->
+        <div class="chart-card glass-card" data-animate="fade-up" data-delay="160">
+          <div class="chart-header">
+            <h3><span class="chart-dot chart-dot--green"></span>Ảnh Hưởng Overlap Ratio</h3>
+            <span class="chart-tag chart-tag--green">Tỷ lệ</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-overlap"></canvas></div>
+        </div>
+
+        <!-- Chart 4: BF Size -->
+        <div class="chart-card glass-card" data-animate="fade-up" data-delay="240">
+          <div class="chart-header">
+            <h3><span class="chart-dot chart-dot--cyan"></span>Kích Thước Bloom Filter</h3>
+            <span class="chart-tag chart-tag--cyan">MB</span>
+          </div>
+          <div class="chart-wrap"><canvas id="chart-bfsize"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Placeholder khi chưa chạy -->
+      <div id="charts-placeholder" class="placeholder-card glass-card" data-animate="fade-up">
+        <div class="placeholder-icon">
+          <span class="ph-bar ph-bar--1"></span>
+          <span class="ph-bar ph-bar--2"></span>
+          <span class="ph-bar ph-bar--3"></span>
+        </div>
+        <h3>Chưa có dữ liệu</h3>
+        <p>Chạy mô phỏng để xem biểu đồ phân tích</p>
+        <a href="#" class="btn btn-outline btn-sm" style="margin-top:20px;" onclick="switchTab('controls'); return false;">↑ Đến phần Mô Phỏng</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ BEST RESULT CARD ═══ -->
+  <div id="best-result-section" class="best-result-section section-dark">
+    <div class="container">
+      <div class="best-result-card glass-card" id="best-result-card">
+        <div class="best-glow"></div>
+        <div class="best-left">
+          <div class="best-trophy-css">
+            <div class="trophy-cup"></div>
+            <div class="trophy-base"></div>
+            <div class="trophy-stand"></div>
+          </div>
+          <div class="best-info">
+            <div class="best-label">Chiến lược tối ưu</div>
+            <div class="best-strategy" id="best-strategy-name">—</div>
+          </div>
+        </div>
+        <div class="best-metrics" id="best-metrics"></div>
+        <div class="best-badge">OPTIMAL</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- ═══ RESULTS TAB ═══ -->
+  <div class="tab-page" data-tab-id="results">
+  <section id="results" class="section section-dark">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Kết Quả</div>
+        <h2 class="section-title">Kết Quả <span class="title-dot">·</span> Chi Tiết</h2>
+        <p class="section-desc">Ba bảng metric chính theo yêu cầu đề bài</p>
+      </div>
+
+      <div id="tables-container">
+
+        <!-- Table 1: Bandwidth -->
+        <div class="table-card glass-card" data-animate="fade-up">
+          <div class="table-header">
+            <h3><span class="table-dot table-dot--cyan"></span>Bảng 1 <span class="title-dot">·</span> Băng Thông Mạng</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Chiến lược</th><th>Dòng gửi</th><th>False Positives</th>
+                <th>Mạng (KB)</th><th>Tiết kiệm</th>
+              </tr></thead>
+              <tbody id="tbody-bandwidth">
+                <tr><td colspan="5" class="table-empty">Chưa có dữ liệu — hãy chạy mô phỏng</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Table 2: Bytes Saved -->
+        <div class="table-card glass-card" data-animate="fade-up">
+          <div class="table-header">
+            <h3><span class="table-dot table-dot--green"></span>Bảng 2 <span class="title-dot">·</span> Bytes Saved vs BF Size</h3>
+            <span class="table-badge">METRIC CHÍNH ĐỀ BÀI</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Chiến lược</th><th>BF (m bits)</th><th>BF (KB)</th>
+                <th>Saved (KB)</th><th>Leverage</th>
+              </tr></thead>
+              <tbody id="tbody-bytes-saved">
+                <tr><td colspan="5" class="table-empty">Chưa có dữ liệu — hãy chạy mô phỏng</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Table 3: FPR Impact -->
+        <div class="table-card glass-card" data-animate="fade-up">
+          <div class="table-header">
+            <h3><span class="table-dot table-dot--orange"></span>Bảng 3 <span class="title-dot">·</span> FPR Impact &amp; Bandwidth Waste</h3>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr>
+                <th>Chiến lược</th><th>FPR Target</th><th>FP Rows</th>
+                <th>FP Bandwidth (KB)</th><th>k (hash functions)</th>
+              </tr></thead>
+              <tbody id="tbody-fpr-impact">
+                <tr><td colspan="5" class="table-empty">Chưa có dữ liệu — hãy chạy mô phỏng</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Conclusion Card -->
+      <div class="conclusion-card glass-card" id="conclusion-card">
+        <h3>Kết Luận <span class="title-dot">·</span> Phân Tích</h3>
+        <div id="conclusion-content"></div>
+      </div>
+
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ THEORY TAB ═══ -->
+  <div class="tab-page" data-tab-id="theory">
+  <section id="theory" class="section">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Lý Thuyết</div>
+        <h2 class="section-title">📖 Phân Tích Lý Thuyết</h2>
+        <p class="section-desc">Công thức &amp; phân tích quy mô đề bài (1M Subscribers / 10M WebLogs)</p>
+      </div>
+      <div class="theory-grid">
+        <div class="theory-card glass-card" data-animate="fade-up" data-delay="0">
+          <h3>🔢 Công Thức Bloom Filter</h3>
+          <div class="formula-list">
+            <div class="formula-item">
+              <span class="formula-label">Kích thước tối ưu (m):</span>
+              <code class="formula">m = -(n × ln(p)) / (ln2)²</code>
+            </div>
+            <div class="formula-item">
+              <span class="formula-label">Số hàm băm tối ưu (k):</span>
+              <code class="formula">k = (m/n) × ln(2)</code>
+            </div>
+            <div class="formula-item">
+              <span class="formula-label">FPR thực tế:</span>
+              <code class="formula">FPR = (1 - e^(-kn/m))^k</code>
+            </div>
+          </div>
+          <div class="formula-note">
+            <strong>n</strong> = số phần tử &nbsp;·&nbsp; <strong>m</strong> = số bits &nbsp;·&nbsp;
+            <strong>k</strong> = số hash &nbsp;·&nbsp; <strong>p</strong> = FPR mong muốn
+          </div>
+        </div>
+
+        <div class="theory-card glass-card" data-animate="fade-up" data-delay="80">
+          <h3>📐 Phân Tích Quy Mô Đề Bài</h3>
+          <div class="theory-config">
+            <span class="config-tag">1M Subscribers</span>
+            <span class="config-tag">10M WebLogs</span>
+            <span class="config-tag">Overlap 20%</span>
+          </div>
+          <button class="btn btn-secondary" onclick="runTheoretical()">🧮 Tính Toán Lý Thuyết</button>
+          <div id="theory-results"></div>
+        </div>
+
+        <div class="theory-card glass-card" data-animate="fade-up" data-delay="160">
+          <h3>💡 Nhận Xét Quan Trọng</h3>
+          <ul class="insight-list">
+            <li><span class="insight-dot green"></span><div><strong>False Negative = 0%</strong> — BF không bao giờ bỏ sót subscriber</div></li>
+            <li><span class="insight-dot green"></span><div><strong>Kết quả chính xác 100%</strong> — FP bị loại ở Inner Join cuối</div></li>
+            <li><span class="insight-dot purple"></span><div><strong>FPR giảm → m tăng</strong> — Trade-off chính xác vs bộ nhớ</div></li>
+            <li><span class="insight-dot teal"></span><div><strong>Overlap thấp = BF hiệu quả nhất</strong> — Loại ~80% data thừa</div></li>
+            <li><span class="insight-dot orange"></span><div><strong>Leverage hàng trăm lần</strong> — 1 byte BF → tiết kiệm hàng trăm bytes</div></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ FOOTER ═══ -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <span class="footer-hex">⬡</span>
+          <div>
+            <div class="footer-name">Bloom Filter Join Optimizer</div>
+            <div class="footer-sub">Đồ án Cuối Kỳ — Cơ Sở Dữ Liệu Phân Tán — Đề tài #15</div>
+          </div>
+        </div>
+        <div class="footer-refs">
+          <div class="footer-ref-item">📚 Özsu &amp; Valduriez, <em>Principles of Distributed Database Systems</em>, 4th Ed.</div>
+          <div class="footer-ref-item">🔬 Bloom (1970) · Kirsch &amp; Mitzenmacher (2006) · Double Hashing</div>
+          <div class="footer-ref-item">⚙️ Python · Flask · Chart.js · MurmurHash3 · bitarray</div>
+        </div>
+      </div>
+      <div class="footer-divider"></div>
+      <div class="footer-bottom">
+        <span>Bloom Filter Semi-Join Optimizer &copy; 2026</span>
+        <span class="footer-live"><span class="live-dot"></span> Server đang chạy tại localhost:5000</span>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
