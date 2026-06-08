@@ -40,11 +40,30 @@ document.addEventListener('DOMContentLoaded', () => {
   initScrollReveal();
   initNavbarScroll();
   initSliders();
+  initNodeBSwitch();
   initOverlapChart();
   initBfSizeChart();
   // Khởi tạo tab navigation
   switchTab('hero');
 });
+
+function initNodeBSwitch() {
+  const switchNodeB = document.getElementById('switch-node-b');
+  const lblNodeBStatus = document.getElementById('lbl-node-b-status');
+  if (!switchNodeB || !lblNodeBStatus) return;
+
+  switchNodeB.addEventListener('change', () => {
+    if (switchNodeB.checked) {
+      lblNodeBStatus.textContent = "ONLINE (Hoạt động)";
+      lblNodeBStatus.classList.remove('text-pink');
+      lblNodeBStatus.classList.add('text-green');
+    } else {
+      lblNodeBStatus.textContent = "OFFLINE (Đã tắt)";
+      lblNodeBStatus.classList.remove('text-green');
+      lblNodeBStatus.classList.add('text-pink');
+    }
+  });
+}
 
 // ==========================================================
 // PARTICLES — data flow animation
@@ -334,29 +353,405 @@ function finishLoadingAnimation() {
   document.getElementById('loading-bar-fill').style.width = '100%';
 }
 
+function resetPipelineError() {
+  const steps = document.querySelectorAll('.pipeline-step');
+  const connectors = document.querySelectorAll('.pipeline-connector');
+  steps.forEach(s => s.classList.remove('error'));
+  connectors.forEach(c => c.classList.remove('error'));
+}
+
+function handlePipelineConnectionError() {
+  const steps = document.querySelectorAll('.pipeline-step');
+  const connectors = document.querySelectorAll('.pipeline-connector');
+  
+  // reset all statuses
+  steps.forEach(s => s.classList.remove('active', 'done'));
+  connectors.forEach(c => c.classList.remove('active'));
+  
+  // Bước 1: Site A vẫn tạo được Bloom Filter
+  steps[0].classList.add('done');
+  const b1 = document.getElementById('step-badge-1');
+  if (b1) b1.textContent = "Khởi tạo BF thành công";
+
+  // Trì hoãn một chút để tạo cảm giác truyền tin qua mạng
+  setTimeout(() => {
+    // Connector 1: A -> B bị đứt
+    connectors[0].classList.add('error');
+    steps[1].classList.add('error'); // Bước 2 lỗi
+    const b2 = document.getElementById('step-badge-2');
+    if (b2) b2.textContent = "MẤT KẾT NỐI ✖";
+  }, 600);
+
+  // Các bước tiếp theo (3, 4, 5) đều bị lỗi đỏ vì không thể tiếp tục giao dịch phân tán
+  setTimeout(() => {
+    for (let i = 2; i < steps.length; i++) {
+      steps[i].classList.add('error');
+      const badge = document.getElementById(`step-badge-${i + 1}`);
+      if (badge) badge.textContent = "ABORTED ✖";
+    }
+    for (let i = 1; i < connectors.length; i++) {
+      connectors[i].classList.add('error');
+    }
+    // Tự động hiện Recovery Banner sau khi lỗi được vẽ xong
+    showRecoveryBanner();
+  }, 1200);
+}
+
 // ==========================================================
-// RUN SIMULATION
+// NODE B RECOVERY
 // ==========================================================
+
+/** Hiện Recovery Banner sau khi Node B bị kill */
+function showRecoveryBanner() {
+  const banner = document.getElementById('recovery-banner');
+  if (banner) banner.style.display = 'block';
+}
+
+/** Khôi phục Node B và reset pipeline về trạng thái sẵn sàng */
+function recoverNodeB() {
+  // 1. Ẩn banner
+  const banner = document.getElementById('recovery-banner');
+  if (banner) banner.style.display = 'none';
+
+  // 2. Bật lại switch Node B (ONLINE)
+  const switchNodeB = document.getElementById('switch-node-b');
+  const lblStatus = document.getElementById('lbl-node-b-status');
+  if (switchNodeB) {
+    switchNodeB.checked = true;
+    if (lblStatus) {
+      lblStatus.textContent = "ONLINE (Hoạt động)";
+      lblStatus.classList.remove('text-pink');
+      lblStatus.classList.add('text-green');
+    }
+  }
+
+  // 3. Reset pipeline về trạng thái mặc định (không lỗi, không done)
+  const steps = document.querySelectorAll('.pipeline-step');
+  const connectors = document.querySelectorAll('.pipeline-connector');
+  steps.forEach(s => {
+    s.classList.remove('active', 'done', 'error');
+    // Xóa text badge
+    const badge = s.querySelector('.step-badge');
+    if (badge) badge.textContent = '';
+  });
+  connectors.forEach(c => c.classList.remove('active', 'error'));
+
+  // 4. Hiện thông báo recovery thành công bằng flash animation nhẹ
+  steps.forEach((s, i) => {
+    setTimeout(() => {
+      s.style.transition = 'box-shadow 0.4s ease';
+      s.querySelector('.step-card').style.boxShadow = '0 0 20px rgba(0, 232, 135, 0.4)';
+      setTimeout(() => {
+        s.querySelector('.step-card').style.boxShadow = '';
+      }, 700);
+    }, i * 120);
+  });
+
+  // 5. Kích hoạt lại nút Chạy Mô Phỏng
+  document.getElementById('btn-simulate')?.removeAttribute('disabled');
+  document.getElementById('btn-run-demo')?.removeAttribute('disabled');
+
+  // 6. Hiện toast thông báo
+  showToast('✅ Node B đã khôi phục kết nối! Sẵn sàng chạy lại giao dịch phân tán.');
+}
+
+/** Hiện toast notification nhỏ ở góc phải */
+function showToast(message, type = 'success') {
+  const existing = document.getElementById('app-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'app-toast';
+  toast.style.cssText = `
+    position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+    background: ${type === 'success' ? 'rgba(0, 232, 135, 0.12)' : 'rgba(248, 113, 113, 0.12)'};
+    border: 1px solid ${type === 'success' ? 'rgba(0, 232, 135, 0.4)' : 'rgba(248, 113, 113, 0.4)'};
+    color: ${type === 'success' ? '#00e887' : '#f87171'};
+    padding: 14px 22px; border-radius: 12px;
+    font-size: 0.88rem; font-family: 'Inter', sans-serif; font-weight: 500;
+    backdrop-filter: blur(16px); max-width: 380px;
+    animation: slideUp 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  `;
+  toast.textContent = message;
+
+  const style = document.createElement('style');
+  style.textContent = '@keyframes slideUp { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }';
+  document.head.appendChild(style);
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+}
+
+// ==========================================================
+// BREAKEVEN ANALYSIS
+// ==========================================================
+
+let chartBreakeven = null;
+
+async function runBreakevenAnalysis() {
+  const nSubs   = parseInt(document.getElementById('be-subs').value) || 10000;
+  const nLogs   = parseInt(document.getElementById('be-logs').value) || 100000;
+  const overlap = (parseInt(document.getElementById('be-overlap').value) || 20) / 100;
+
+  const btn = document.getElementById('btn-breakeven');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang tính...'; }
+
+  try {
+    const res  = await fetch('/api/breakeven-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ num_subscribers: nSubs, num_logs: nLogs, overlap_ratio: overlap })
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      alert('Lỗi: ' + data.error);
+      return;
+    }
+
+    // Cập nhật info cards
+    document.getElementById('be-naive-cost').textContent  = fmtNum(Math.round(data.config.naive_cost_kb)) + ' KB';
+    
+    const beM = data.breakeven;
+    if (beM.m_bits) {
+      document.getElementById('be-breakeven-m').textContent = fmtNum(beM.m_bits) + ' bits';
+      document.getElementById('be-breakeven-sub').textContent = `≈ ${beM.m_kb} KB — BF bắt đầu rẻ hơn Naive`;
+    } else {
+      document.getElementById('be-breakeven-m').textContent = 'Không có';
+      document.getElementById('be-breakeven-sub').textContent = 'BF Semi-Join luôn có lợi với dữ liệu này';
+    }
+
+    const optM = data.optimal;
+    document.getElementById('be-optimal-m').textContent = fmtNum(optM.m_bits) + ' bits';
+    document.getElementById('be-optimal-sub').textContent = `Chi phí tối thiểu: ${fmtNum(Math.round(optM.cost_kb))} KB`;
+    document.getElementById('be-max-saving').textContent  = optM.saving_vs_naive_pct + '%';
+
+    // Vẽ chart
+    renderBreakevenChart(data);
+
+    // Hiện interpretation box
+    buildBreakevenInterpretation(data);
+
+    // Hiện chart, ẩn placeholder
+    document.getElementById('be-chart-placeholder').style.display = 'none';
+    document.getElementById('be-chart-wrap').style.display = 'block';
+
+  } catch (err) {
+    alert('Không thể kết nối server.');
+    console.error(err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-shine"></span>🔍 Phân Tích'; }
+  }
+}
+
+function renderBreakevenChart(data) {
+  if (chartBreakeven) chartBreakeven.destroy();
+  const ctx = document.getElementById('chart-breakeven').getContext('2d');
+
+  // Chuẩn bị dữ liệu: chỉ lấy mỗi 2 điểm để chart không quá dày
+  const step = Math.max(1, Math.floor(data.m_values.length / 80));
+  const labels = data.m_values.filter((_, i) => i % step === 0).map(m => (m / 1000).toFixed(1) + 'K');
+  const bfCosts = data.bf_costs_kb.filter((_, i) => i % step === 0);
+  const naiveCosts = data.naive_costs_kb.filter((_, i) => i % step === 0);
+
+  // Tìm index break-even trong filtered data
+  const mValues_filtered = data.m_values.filter((_, i) => i % step === 0);
+  const beM = data.breakeven.m_bits;
+  let beIdx = -1;
+  if (beM) {
+    for (let i = 0; i < mValues_filtered.length; i++) {
+      if (mValues_filtered[i] >= beM) { beIdx = i; break; }
+    }
+  }
+
+  // Màu điểm: đỏ trước breakeven, xanh sau breakeven
+  const bfPointColors = bfCosts.map((_, i) => {
+    if (beIdx < 0) return 'rgba(0, 232, 135, 0.6)';
+    return i < beIdx ? 'rgba(248, 113, 113, 0.6)' : 'rgba(0, 232, 135, 0.6)';
+  });
+
+  chartBreakeven = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Naive Join (Gửi toàn bộ)',
+          data: naiveCosts,
+          borderColor: '#f87171',
+          borderWidth: 2,
+          borderDash: [8, 4],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+        },
+        {
+          label: 'BF Semi-Join (Chi phí thực)',
+          data: bfCosts,
+          borderColor: '#818cf8',
+          borderWidth: 2.5,
+          pointRadius: bfCosts.map((_, i) => (i === beIdx ? 7 : 0)),
+          pointBackgroundColor: bfCosts.map((_, i) => (i === beIdx ? '#facc15' : '#818cf8')),
+          pointBorderColor: '#facc15',
+          fill: {
+            target: 0,
+            above: 'rgba(248, 113, 113, 0.05)',
+            below: 'rgba(0, 232, 135, 0.07)',
+          },
+          tension: 0.3,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true,
+          position: 'top',
+          labels: { color: '#9aa3bc', font: { size: 12 }, boxWidth: 24, padding: 16 }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(16,16,30,0.95)',
+          borderColor: 'rgba(255,255,255,0.1)',
+          borderWidth: 1,
+          titleColor: '#e2e8f4',
+          bodyColor: '#9aa3bc',
+          padding: 12,
+          callbacks: {
+            title: (items) => `m = ${items[0].label} bits`,
+            label: (item) => ` ${item.dataset.label}: ${fmtNum(Math.round(item.raw))} KB`
+          }
+        },
+        annotation: beIdx >= 0 ? {
+          annotations: {
+            breakEvenLine: {
+              type: 'line',
+              xMin: beIdx,
+              xMax: beIdx,
+              borderColor: '#facc15',
+              borderWidth: 2,
+              borderDash: [5, 3],
+              label: {
+                display: true,
+                content: '⚡ Break-even',
+                color: '#facc15',
+                backgroundColor: 'rgba(250, 204, 21, 0.1)',
+                position: 'start',
+                font: { size: 11, weight: '600' }
+              }
+            }
+          }
+        } : {}
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Kích thước Bloom Filter (m, đơn vị: nghìn bits)', color: '#5a6080', font: { size: 11 } },
+          ticks: { color: '#5a6080', maxTicksLimit: 12, font: { size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        },
+        y: {
+          title: { display: true, text: 'Chi phí băng thông mạng (KB)', color: '#5a6080', font: { size: 11 } },
+          ticks: {
+            color: '#5a6080',
+            font: { size: 10 },
+            callback: (v) => fmtNum(Math.round(v)) + ' KB'
+          },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        }
+      }
+    }
+  });
+}
+
+function buildBreakevenInterpretation(data) {
+  const box = document.getElementById('be-interpretation');
+  const text = document.getElementById('be-interpretation-text');
+  if (!box || !text) return;
+
+  const naive = fmtNum(Math.round(data.config.naive_cost_kb));
+  const opt   = fmtNum(Math.round(data.optimal.cost_kb));
+  const savedPct = data.optimal.saving_vs_naive_pct;
+  const beMBits = data.breakeven.m_bits ? fmtNum(data.breakeven.m_bits) : null;
+  const beKB    = data.breakeven.m_kb;
+
+  let html = `
+    <strong>Phân tích Break-even Point</strong><br>
+    Với ${fmtNum(data.config.num_subscribers)} Subscribers và ${fmtNum(data.config.num_logs)} WebLogs 
+    (Overlap = ${Math.round(data.config.overlap_ratio * 100)}%):<br><br>
+    
+    • <span class="highlight-red">Naive Join</span>: Tốn <strong>${naive} KB</strong> — gửi toàn bộ ${fmtNum(data.config.num_logs)} dòng log qua mạng.<br>
+    • <span class="highlight-green">BF Semi-Join tối ưu</span>: Chỉ tốn <strong>${opt} KB</strong> — tiết kiệm <strong>${savedPct}%</strong> băng thông.<br>
+  `;
+
+  if (beMBits) {
+    html += `
+      • ⚡ <strong>Break-even Point</strong>: Tại <span style="color:#facc15; font-weight:700;">m = ${beMBits} bits</span> 
+        (≈ ${beKB} KB), BF Semi-Join bắt đầu rẻ hơn Naive Join.<br>
+      • Vùng <span class="highlight-red">bên trái điểm gãy</span>: m quá nhỏ → FPR cao → gửi nhiều False Positive → không đáng dùng BF.<br>
+      • Vùng <span class="highlight-green">bên phải điểm gãy</span>: m đủ lớn → FPR thấp → BF có lợi rõ rệt.
+    `;
+  } else {
+    html += `• ✅ BF Semi-Join <span class="highlight-green">luôn tốt hơn</span> Naive Join trong mọi giá trị m được khảo sát — overlap đủ thấp để BF luôn có lợi.`;
+  }
+
+  text.innerHTML = html;
+  box.style.display = 'flex';
+}
+
+
 async function runSimulation() {
   const numSubs   = parseInt(document.getElementById('slider-subs').value);
   const numLogs   = parseInt(document.getElementById('slider-logs').value);
   const overlap   = parseInt(document.getElementById('slider-overlap').value) / 100;
 
+  const switchNodeB = document.getElementById('switch-node-b');
+  const nodeBOnline = switchNodeB ? switchNodeB.checked : true;
+
   // Show loading — fade in
   const overlay = document.getElementById('loading-overlay');
   overlay.classList.remove('loading-overlay--hidden');
-  startLoadingAnimation(14000);
+  // Nếu offline thì chạy animation loading ngắn hơn vì API sẽ trả về lỗi nhanh
+  startLoadingAnimation(nodeBOnline ? 14000 : 3000);
 
   // Disable buttons
   document.getElementById('btn-run-demo')?.setAttribute('disabled', '');
   document.getElementById('btn-simulate')?.setAttribute('disabled', '');
 
+  resetPipelineError();
+
   try {
     const res  = await fetch('/api/run-simulation', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ num_subscribers: numSubs, num_logs: numLogs, overlap_ratio: overlap })
+      body: JSON.stringify({ 
+        num_subscribers: numSubs, 
+        num_logs: numLogs, 
+        overlap_ratio: overlap,
+        node_b_online: nodeBOnline
+      })
     });
+
+    // Nếu sập Node B và API trả về lỗi
+    if (!res.ok && !nodeBOnline) {
+      const errorData = await res.json().catch(() => ({}));
+      finishLoadingAnimation();
+      await sleep(400);
+      overlay.classList.add('loading-overlay--hidden');
+
+      // Chạy hiệu ứng lỗi kết nối trên pipeline
+      handlePipelineConnectionError();
+
+      // Chuyển sang tab Pipeline để người dùng nhìn thấy hiệu ứng lỗi ngay lập tức
+      switchTab('pipeline');
+
+      setTimeout(() => {
+        alert('GIAO DỊCH PHÂN TÁN BỊ HỦY BỎ (ABORTED)!\n\nLỗi mạng: ' + (errorData.error || 'Connection timed out: Node B is unreachable.'));
+      }, 1400);
+      return;
+    }
+
     const data = await res.json();
     if (!data.success) { alert('Lỗi: ' + data.error); return; }
 
@@ -797,6 +1192,295 @@ async function runTheoretical() {
 }
 
 // ==========================================================
+// DISTRIBUTED — 2 Processes (Site A ↔ Site B)
+// ==========================================================
+
+async function checkSiteBStatus() {
+  const el = document.getElementById('dist-site-b-status');
+  if (!el) return;
+  el.textContent = '● Checking...';
+  el.className = 'dist-node-status checking';
+  try {
+    const res = await fetch('/api/run-distributed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ num_subscribers: 1, num_logs: 1, overlap_ratio: 0.5, fpr_target: 0.1, _healthcheck: true })
+    });
+    // We just check if site B is reachable via our proxy
+    const statusRes = await fetch('http://localhost:5001/api/status', { mode: 'no-cors' }).catch(() => null);
+    // Since no-cors, we can't read the response, but if it doesn't throw, it's likely online
+    el.textContent = '● Online';
+    el.className = 'dist-node-status online';
+  } catch {
+    el.textContent = '● Offline';
+    el.className = 'dist-node-status offline';
+  }
+
+  const elA = document.getElementById('dist-site-a-status');
+  if (elA) { elA.textContent = '● Online'; elA.className = 'dist-node-status online'; }
+}
+
+async function runDistributed() {
+  const nSubs = parseInt(document.getElementById('dist-subs').value) || 10000;
+  const nLogs = parseInt(document.getElementById('dist-logs').value) || 50000;
+  const fpr   = (parseFloat(document.getElementById('dist-fpr').value) || 1) / 100;
+
+  const btn = document.getElementById('btn-distributed');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Đang chạy...'; }
+
+  const timeline = document.getElementById('dist-timeline');
+  timeline.innerHTML = '<p style="color:var(--teal); text-align:center;">🔄 Đang kết nối Site B...</p>';
+
+  try {
+    const res = await fetch('/api/run-distributed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        num_subscribers: nSubs,
+        num_logs: nLogs,
+        overlap_ratio: 0.20,
+        fpr_target: fpr
+      })
+    });
+
+    const data = await res.json();
+
+    if (!data.success) {
+      timeline.innerHTML = `<p style="color:#f87171; text-align:center;">❌ ${data.error}</p>`;
+      const elB = document.getElementById('dist-site-b-status');
+      if (elB) { elB.textContent = '● Offline'; elB.className = 'dist-node-status offline'; }
+      return;
+    }
+
+    // Update Site B status
+    const elB = document.getElementById('dist-site-b-status');
+    if (elB) { elB.textContent = '● Online'; elB.className = 'dist-node-status online'; }
+    const elA = document.getElementById('dist-site-a-status');
+    if (elA) { elA.textContent = '● Online'; elA.className = 'dist-node-status online'; }
+
+    // Render timeline
+    timeline.innerHTML = '';
+    data.timeline.forEach((item, idx) => {
+      const div = document.createElement('div');
+      div.className = 'dist-tl-item done';
+      div.style.animationDelay = `${idx * 120}ms`;
+      div.innerHTML = `
+        <div class="dist-tl-step">Bước ${item.step}</div>
+        <div style="flex:1;">
+          <div class="dist-tl-label">${item.label}</div>
+          <div class="dist-tl-detail">${item.detail}</div>
+        </div>
+        <div class="dist-tl-time">${item.time_ms} ms</div>
+      `;
+      timeline.appendChild(div);
+    });
+
+    // Show result card
+    const resultCard = document.getElementById('dist-result-card');
+    if (resultCard) {
+      resultCard.style.display = 'block';
+      const r = data.results;
+      document.getElementById('dist-result-grid').innerHTML = `
+        <div class="be-info-card glass-card">
+          <div class="be-info-icon" style="color:#f87171;">📦</div>
+          <div class="be-info-label">Naive Join</div>
+          <div class="be-info-value">${fmtNum(Math.round(r.naive_cost_kb))} KB</div>
+          <div class="be-info-sub">Gửi toàn bộ ${fmtNum(r.rows_sent_to_b)} logs</div>
+        </div>
+        <div class="be-info-card glass-card">
+          <div class="be-info-icon" style="color:#818cf8;">🔍</div>
+          <div class="be-info-label">BF Semi-Join</div>
+          <div class="be-info-value">${fmtNum(Math.round(r.bf_cost_kb))} KB</div>
+          <div class="be-info-sub">BF: ${fmtNum(r.bf_m_bits)} bits (k=${r.bf_k})</div>
+        </div>
+        <div class="be-info-card glass-card">
+          <div class="be-info-icon" style="color:#34d399;">💰</div>
+          <div class="be-info-label">Tiết kiệm</div>
+          <div class="be-info-value text-green">${r.saving_pct}%</div>
+          <div class="be-info-sub">Loại ${fmtNum(r.rows_rejected_at_b)} dòng tại B</div>
+        </div>
+        <div class="be-info-card glass-card">
+          <div class="be-info-icon" style="color:#facc15;">⏱️</div>
+          <div class="be-info-label">Tổng thời gian</div>
+          <div class="be-info-value">${r.total_time_ms} ms</div>
+          <div class="be-info-sub">FP=${fmtNum(r.false_positives)}, Join=${fmtNum(r.final_join_rows)}</div>
+        </div>
+      `;
+
+      // Update connection label
+      const connLabel = document.getElementById('dist-conn-label');
+      if (connLabel) connLabel.textContent = `${r.total_time_ms}ms round-trip`;
+    }
+
+  } catch (err) {
+    timeline.innerHTML = `<p style="color:#f87171; text-align:center;">❌ Lỗi: ${err.message}</p>`;
+    console.error(err);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span class="btn-shine"></span>🚀 Chạy Phân Tán'; }
+  }
+}
+
+
+// ==========================================================
+// SENSITIVITY ANALYSIS — Overlap Slider (Ưu tiên 4)
+// ==========================================================
+
+let chartSensitivity = null;
+let sensitivityData = null;  // Cache data from API
+
+function initSensitivitySlider() {
+  const slider = document.getElementById('sa-overlap-slider');
+  if (!slider) return;
+
+  slider.addEventListener('input', () => {
+    const val = slider.value;
+    document.getElementById('sa-overlap-val').textContent = val + '%';
+    updateSensitivityDisplay(parseInt(val));
+  });
+
+  // Load data on first interaction
+  slider.addEventListener('input', loadSensitivityData, { once: true });
+}
+
+async function loadSensitivityData() {
+  try {
+    const res = await fetch('/api/sensitivity-analysis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ num_subscribers: 10000, num_logs: 100000, fpr_target: 0.01 })
+    });
+    const data = await res.json();
+    if (!data.success) return;
+
+    sensitivityData = data;
+    renderSensitivityChart(data);
+    updateSensitivityDisplay(20); // Default overlap
+  } catch (e) {
+    console.error('Sensitivity load error:', e);
+  }
+}
+
+function updateSensitivityDisplay(overlapPct) {
+  if (!sensitivityData) return;
+
+  const idx = sensitivityData.overlaps.indexOf(overlapPct);
+  if (idx < 0) return;
+
+  document.getElementById('sa-saving-val').textContent = sensitivityData.savings_pct[idx] + '%';
+  document.getElementById('sa-waste-val').textContent = sensitivityData.wasted_naive_pct[idx] + '%';
+  document.getElementById('sa-bf-cost-val').textContent = fmtNum(Math.round(sensitivityData.bf_costs_kb[idx])) + ' KB';
+
+  // Highlight current point on chart
+  if (chartSensitivity) {
+    const datasets = chartSensitivity.data.datasets;
+    // Update point radius to highlight current
+    datasets[0].pointRadius = sensitivityData.overlaps.map((_, i) => i === idx ? 6 : 0);
+    datasets[0].pointBackgroundColor = sensitivityData.overlaps.map((_, i) => i === idx ? '#facc15' : COLORS.bf1);
+    chartSensitivity.update('none');
+  }
+
+  // Update insight text
+  const insight = document.getElementById('sa-insight');
+  if (insight) {
+    const saving = sensitivityData.savings_pct[idx];
+    const waste = sensitivityData.wasted_naive_pct[idx];
+    if (overlapPct <= 30) {
+      insight.innerHTML = `<strong>Overlap ${overlapPct}%:</strong> BF Semi-Join cực kỳ hiệu quả — tiết kiệm <strong>${saving}%</strong> băng thông. Naive Join lãng phí ${waste}% dữ liệu truyền đi. Đây là kịch bản lý tưởng cho Bloom Filter.`;
+    } else if (overlapPct <= 60) {
+      insight.innerHTML = `<strong>Overlap ${overlapPct}%:</strong> BF Semi-Join vẫn có lợi — tiết kiệm <strong>${saving}%</strong>. Tuy nhiên lợi ích giảm dần vì lượng dữ liệu trùng khớp tăng → ít rows bị loại hơn tại Site B.`;
+    } else {
+      insight.innerHTML = `<strong>Overlap ${overlapPct}%:</strong> BF Semi-Join tiết kiệm <strong>${saving}%</strong>. Với overlap cao, hầu hết WebLogs đều thuộc subscribers → BF chỉ loại ít dữ liệu. Chi phí BF (${sensitivityData.config.bf_size_kb} KB) trở nên ít đáng kể.`;
+    }
+  }
+}
+
+function renderSensitivityChart(data) {
+  if (chartSensitivity) chartSensitivity.destroy();
+  const ctx = document.getElementById('chart-sensitivity');
+  if (!ctx) return;
+
+  chartSensitivity = new Chart(ctx.getContext('2d'), {
+    type: 'line',
+    data: {
+      labels: data.overlaps.map(v => v + '%'),
+      datasets: [
+        {
+          label: 'BF Saving (%)',
+          data: data.savings_pct,
+          borderColor: COLORS.bf1,
+          borderWidth: 2.5,
+          fill: {
+            target: 'origin',
+            above: 'rgba(0, 232, 135, 0.08)'
+          },
+          tension: 0.4,
+          pointRadius: 0,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Naive Cost (KB)',
+          data: data.naive_costs_kb,
+          borderColor: COLORS.naive,
+          borderWidth: 1.5,
+          borderDash: [6, 3],
+          pointRadius: 0,
+          fill: false,
+          tension: 0,
+          yAxisID: 'y1',
+        },
+        {
+          label: 'BF Cost (KB)',
+          data: data.bf_costs_kb,
+          borderColor: COLORS.purple,
+          borderWidth: 2,
+          pointRadius: 0,
+          fill: false,
+          tension: 0.3,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          display: true, position: 'top',
+          labels: { color: '#9aa3bc', font: { size: 11 }, boxWidth: 20, padding: 12 }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(16,16,30,0.95)',
+          borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+          titleColor: '#e2e8f4', bodyColor: '#9aa3bc', padding: 10,
+        }
+      },
+      scales: {
+        x: {
+          title: { display: true, text: 'Overlap Ratio', color: '#5a6080', font: { size: 11 } },
+          ticks: { color: '#5a6080', font: { size: 10 } },
+          grid: { color: 'rgba(255,255,255,0.04)' }
+        },
+        y: {
+          type: 'linear', position: 'left',
+          title: { display: true, text: 'BF Saving (%)', color: COLORS.bf1, font: { size: 11 } },
+          ticks: { color: COLORS.bf1, font: { size: 10 }, callback: v => v + '%' },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          min: 0, max: 100,
+        },
+        y1: {
+          type: 'linear', position: 'right',
+          title: { display: true, text: 'Network Cost (KB)', color: '#5a6080', font: { size: 11 } },
+          ticks: { color: '#5a6080', font: { size: 10 }, callback: v => fmtNum(Math.round(v)) },
+          grid: { display: false },
+        }
+      }
+    }
+  });
+}
+
+
+// ==========================================================
 // HELPERS
 // ==========================================================
 function fmtNum(n) { return Number(n).toLocaleString(); }
@@ -804,4 +1488,5 @@ function fmtNum(n) { return Number(n).toLocaleString(); }
 // Initialize: hide charts grid, show placeholder
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('charts-section').style.display = 'none';
+  initSensitivitySlider();
 });

@@ -9,3 +9,15 @@ env/
 .idea/
 .DS_Store
 *.log
+.gemini/
+
+# Large simulation datasets (Chặn dữ liệu nặng)
+*.csv
+*.parquet
+*.xlsx
+
+# Generated documents & media (Nộp riêng, không push lên GitHub)
+*.docx
+*.pdf
+*.pptx
+*.mp4

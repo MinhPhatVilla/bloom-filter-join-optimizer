@@ -26,6 +26,8 @@
         <li><a href="#" class="nav-link" data-tab="dashboard" onclick="switchTab('dashboard'); return false;">Dashboard</a></li>
         <li><a href="#" class="nav-link" data-tab="results"   onclick="switchTab('results');   return false;">Kết Quả</a></li>
         <li><a href="#" class="nav-link" data-tab="theory"    onclick="switchTab('theory');    return false;">Lý Thuyết</a></li>
+        <li><a href="#" class="nav-link nav-link--highlight" data-tab="breakeven" onclick="switchTab('breakeven'); return false;">Break-even ⚡</a></li>
+        <li><a href="#" class="nav-link nav-link--distributed" data-tab="distributed" onclick="switchTab('distributed'); return false;">🌐 Phân Tán</a></li>
       </ul>
       <button class="btn btn-primary btn-sm nav-cta" id="nav-cta-btn" onclick="runSimulation()">
         <span class="nav-cta-pulse"></span>
@@ -191,6 +193,24 @@
           </div>
         </div>
       </div>
+
+      <!-- Recovery Banner (ẩn theo mặc định, hiện khi Node B bị kill) -->
+      <div id="recovery-banner" class="recovery-banner" style="display:none;">
+        <div class="container">
+          <div class="recovery-content glass-card">
+            <div class="recovery-icon">⚠️</div>
+            <div class="recovery-text">
+              <strong>Node B đã sập!</strong>
+              <span>Giao dịch phân tán bị hủy (HTTP 504 Gateway Timeout)</span>
+            </div>
+            <button id="btn-recover-node-b" class="btn btn-recover" onclick="recoverNodeB()">
+              <span class="btn-shine"></span>
+              🔄 Khôi phục Node B
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </section>
   </div>
@@ -240,8 +260,24 @@
           <div class="control-hint-sub" id="overlap-hint">~80% guest logs (không phải subscriber)</div>
         </div>
 
+        <!-- Toggle: Node B Status -->
+        <div class="control-card glass-card" data-animate="fade-up" data-delay="200">
+          <label class="control-label">
+            <span class="ctrl-dot ctrl-dot--pink"></span>
+            Trạng thái Node B <span class="ctrl-site">(Web Server)</span>
+          </label>
+          <div class="switch-container">
+            <label class="switch">
+              <input type="checkbox" id="switch-node-b" checked>
+              <span class="switch-slider round"></span>
+            </label>
+            <span class="switch-label text-green" id="lbl-node-b-status">ONLINE (Hoạt động)</span>
+          </div>
+          <div class="control-hint-sub" id="node-b-hint" style="margin-top: 12px;">Mô phỏng sập mạng hoặc tắt vật lý Node B để kiểm thử khả năng chịu lỗi của giao dịch phân tán.</div>
+        </div>
+
         <!-- Action Card -->
-        <div class="control-card control-card--action glass-card control-btn-wrap" data-animate="fade-up" data-delay="240">
+        <div class="control-card control-card--action glass-card control-btn-wrap" data-animate="fade-up" data-delay="280">
           <div class="action-icon-wrap">
             <div class="action-ring"></div>
             <span class="action-bolt">⚡</span>
@@ -501,6 +537,187 @@
           </ul>
         </div>
       </div>
+    </div>
+  <!-- Sensitivity Analysis Card -->
+      <div class="theory-card glass-card sensitivity-card" data-animate="fade-up" data-delay="240" style="grid-column: 1 / -1;">
+        <h3>🎚️ Phân Tích Độ Nhạy — Overlap Ratio</h3>
+        <p class="sensitivity-desc">Kéo slider để xem hiệu quả BF Semi-Join thay đổi theo tỷ lệ dữ liệu chồng lấp (overlap)</p>
+        <div class="sa-controls">
+          <div class="sa-slider-wrap">
+            <label>Overlap: <strong id="sa-overlap-val">20%</strong></label>
+            <input type="range" id="sa-overlap-slider" class="slider slider--orange" min="5" max="90" value="20" step="5">
+            <div class="slider-range-hint"><span>5%</span><span>90%</span></div>
+          </div>
+          <div class="sa-info-row" id="sa-info-row">
+            <div class="sa-info"><span class="sa-lbl">BF Saving:</span> <span class="sa-val text-green" id="sa-saving-val">—</span></div>
+            <div class="sa-info"><span class="sa-lbl">Naive Waste:</span> <span class="sa-val text-pink" id="sa-waste-val">—</span></div>
+            <div class="sa-info"><span class="sa-lbl">BF Cost:</span> <span class="sa-val" id="sa-bf-cost-val">—</span></div>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:280px; margin-top:16px;"><canvas id="chart-sensitivity"></canvas></div>
+        <div class="sa-insight" id="sa-insight"></div>
+      </div>
+
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ DISTRIBUTED TAB ═══ -->
+  <div class="tab-page" data-tab-id="distributed">
+  <section id="distributed" class="section section-dark">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Hệ Thống Phân Tán</div>
+        <h2 class="section-title">🌐 Mô Phỏng <span class="title-dot">·</span> 2 Processes</h2>
+        <p class="section-desc">Thực thi BF Semi-Join qua 2 Flask server thật sự (Site A port 5000 ↔ Site B port 5001)</p>
+      </div>
+
+      <!-- Architecture Diagram -->
+      <div class="dist-arch glass-card" data-animate="fade-up">
+        <div class="dist-arch-row">
+          <div class="dist-node dist-node--a">
+            <div class="dist-node-icon">🏢</div>
+            <div class="dist-node-name">Site A</div>
+            <div class="dist-node-detail">port 5000 • Subscribers</div>
+            <div class="dist-node-status" id="dist-site-a-status">● Online</div>
+          </div>
+          <div class="dist-conn">
+            <div class="dist-conn-line"></div>
+            <div class="dist-conn-label" id="dist-conn-label">HTTP REST API</div>
+          </div>
+          <div class="dist-node dist-node--b">
+            <div class="dist-node-icon">🖥️</div>
+            <div class="dist-node-name">Site B</div>
+            <div class="dist-node-detail">port 5001 • WebLogs</div>
+            <div class="dist-node-status" id="dist-site-b-status">● Checking...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Controls -->
+      <div class="dist-controls glass-card" data-animate="fade-up" style="margin-top:24px;">
+        <div class="be-controls-row">
+          <div class="be-ctrl">
+            <label>Subscribers</label>
+            <input type="number" id="dist-subs" value="10000" min="1000" max="50000" step="1000" class="be-input">
+          </div>
+          <div class="be-ctrl">
+            <label>WebLogs</label>
+            <input type="number" id="dist-logs" value="50000" min="5000" max="200000" step="5000" class="be-input">
+          </div>
+          <div class="be-ctrl">
+            <label>FPR (%)</label>
+            <input type="number" id="dist-fpr" value="1" min="0.1" max="10" step="0.1" class="be-input">
+          </div>
+          <div class="be-ctrl be-ctrl--action">
+            <button class="btn btn-primary" onclick="runDistributed()" id="btn-distributed">
+              <span class="btn-shine"></span>
+              🚀 Chạy Phân Tán
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Timeline -->
+      <div class="dist-timeline glass-card" data-animate="fade-up" style="margin-top:24px;" id="dist-timeline-wrap">
+        <h3 style="margin-bottom:20px;">Timeline thực thi</h3>
+        <div id="dist-timeline" class="dist-timeline-list">
+          <p style="color:var(--text-muted); text-align:center;">Nhấn "🚀 Chạy Phân Tán" để bắt đầu mô phỏng</p>
+        </div>
+      </div>
+
+      <!-- Results -->
+      <div class="dist-result glass-card" data-animate="fade-up" style="margin-top:24px; display:none;" id="dist-result-card">
+        <h3 style="margin-bottom:16px;">🏆 Kết Quả Giao Dịch Phân Tán</h3>
+        <div class="breakeven-info-grid" id="dist-result-grid"></div>
+      </div>
+
+    </div>
+  </section>
+  </div>
+
+  <!-- ═══ BREAKEVEN TAB ═══ -->
+  <div class="tab-page" data-tab-id="breakeven">
+  <section id="breakeven" class="section">
+    <div class="container">
+      <div class="section-header" data-animate="fade-up">
+        <div class="section-tag">Phân Tích Chuyên Sâu</div>
+        <h2 class="section-title">Break-even <span class="title-dot">·</span> Điểm Gãy</h2>
+        <p class="section-desc">Tìm ngưỡng kích thước m (bits) tối thiểu để BF Semi-Join bắt đầu tiết kiệm băng thông hơn Naive Join</p>
+      </div>
+
+      <!-- Info Cards Row -->
+      <div class="breakeven-info-grid" id="breakeven-info-grid">
+        <div class="be-info-card glass-card" data-animate="fade-up" data-delay="0">
+          <div class="be-info-icon" style="color:#f87171;">📊</div>
+          <div class="be-info-label">Chi phí Naive Join (baseline)</div>
+          <div class="be-info-value" id="be-naive-cost">—</div>
+          <div class="be-info-sub">Gửi toàn bộ WebLogs qua mạng</div>
+        </div>
+        <div class="be-info-card glass-card" data-animate="fade-up" data-delay="80">
+          <div class="be-info-icon" style="color:#facc15;">⚡</div>
+          <div class="be-info-label">Break-even tại m =</div>
+          <div class="be-info-value" id="be-breakeven-m">—</div>
+          <div class="be-info-sub" id="be-breakeven-sub">BF bắt đầu rẻ hơn Naive</div>
+        </div>
+        <div class="be-info-card glass-card" data-animate="fade-up" data-delay="160">
+          <div class="be-info-icon" style="color:#34d399;">🏆</div>
+          <div class="be-info-label">Điểm tối ưu (m tốt nhất)</div>
+          <div class="be-info-value" id="be-optimal-m">—</div>
+          <div class="be-info-sub" id="be-optimal-sub">Chi phí BF thấp nhất</div>
+        </div>
+        <div class="be-info-card glass-card" data-animate="fade-up" data-delay="240">
+          <div class="be-info-icon" style="color:#818cf8;">💾</div>
+          <div class="be-info-label">Tiết kiệm tối đa</div>
+          <div class="be-info-value text-green" id="be-max-saving">—</div>
+          <div class="be-info-sub">so với Naive Join</div>
+        </div>
+      </div>
+
+      <!-- Breakeven Chart -->
+      <div class="be-chart-wrap glass-card" data-animate="fade-up" style="margin-top:32px;">
+        <div class="chart-header">
+          <h3><span class="chart-dot" style="background:linear-gradient(135deg,#f87171,#818cf8);"></span>Chi Phí Mạng theo Kích Thước Bloom Filter (m bits)</h3>
+          <span class="chart-tag" style="background:rgba(248,113,113,0.15);color:#f87171;">KB</span>
+        </div>
+        <div id="be-chart-placeholder" class="be-placeholder">
+          <p>Điều chỉnh tham số bên dưới và nhấn <strong>Phân tích</strong> để xem biểu đồ</p>
+        </div>
+        <div class="chart-wrap" id="be-chart-wrap" style="display:none; height:380px;">
+          <canvas id="chart-breakeven"></canvas>
+        </div>
+      </div>
+
+      <!-- Controls for breakeven -->
+      <div class="be-controls glass-card" data-animate="fade-up" style="margin-top:24px;">
+        <h3 style="margin-bottom:20px; font-size:1rem;">⚙️ Tham số phân tích Break-even</h3>
+        <div class="be-controls-row">
+          <div class="be-ctrl">
+            <label>Subscribers (n)</label>
+            <input type="number" id="be-subs" value="10000" min="1000" max="1000000" step="1000" class="be-input">
+          </div>
+          <div class="be-ctrl">
+            <label>WebLogs</label>
+            <input type="number" id="be-logs" value="100000" min="10000" max="5000000" step="10000" class="be-input">
+          </div>
+          <div class="be-ctrl">
+            <label>Overlap Ratio (%)</label>
+            <input type="number" id="be-overlap" value="20" min="1" max="99" step="1" class="be-input">
+          </div>
+          <div class="be-ctrl be-ctrl--action">
+            <button class="btn btn-primary" onclick="runBreakevenAnalysis()" id="btn-breakeven">
+              <span class="btn-shine"></span>
+              🔍 Phân Tích
+            </button>
+          </div>
+        </div>
+        <div class="be-interpretation" id="be-interpretation" style="display:none;">
+          <div class="be-interp-icon">💡</div>
+          <div id="be-interpretation-text"></div>
+        </div>
+      </div>
+
     </div>
   </section>
   </div>
