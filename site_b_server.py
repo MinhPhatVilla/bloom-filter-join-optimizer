@@ -1,21 +1,3 @@
-"""
-==========================================================================
-SITE B SERVER — Flask Server Giả Lập Node B (Web Server Site)
-==========================================================================
-Chạy ĐỘC LẬP trên port 5001.
-
-Đây là bằng chứng hệ thống phân tán THẬT SỰ:
-  - Site A (port 5000): Trung tâm — giữ bảng Subscribers
-  - Site B (port 5001): Chi nhánh — giữ bảng WebLogs
-
-Giao tiếp giữa Site A ↔ Site B hoàn toàn qua HTTP REST API.
-
-Cách chạy:
-    Terminal 1: python site_b_server.py      (Site B — port 5001)
-    Terminal 2: python app.py                (Site A — port 5000)
-==========================================================================
-"""
-
 import sys
 import io
 import json
@@ -52,14 +34,12 @@ site_b_data = {
     'total_rows_filtered': 0, # Tổng số dòng đã lọc qua tất cả request
 }
 
-
 # =================================================================
 # HEALTH CHECK — Kiểm tra Site B đang hoạt động
 # =================================================================
 
 @app.route('/api/status')
 def get_status():
-    """Trả về trạng thái sức khoẻ của Site B."""
     return jsonify({
         'status': site_b_data['status'],
         'site': 'Site B (Web Server)',
@@ -70,19 +50,12 @@ def get_status():
         'total_rows_filtered': site_b_data['total_rows_filtered'],
     })
 
-
 # =================================================================
 # LOAD DATA — Site A gửi dữ liệu WebLogs cho Site B giữ
 # =================================================================
 
 @app.route('/api/load-data', methods=['POST'])
 def load_data():
-    """
-    Nhận dữ liệu WebLogs từ Site A và lưu tại bộ nhớ Site B.
-    
-    Body (JSON):
-        weblogs: list of dicts (mỗi dict = 1 dòng WebLog)
-    """
     try:
         data = request.get_json()
         records = data.get('weblogs', [])
@@ -101,29 +74,12 @@ def load_data():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # FILTER LOGS — Lọc WebLogs bằng Bloom Filter nhận từ Site A
 # =================================================================
 
 @app.route('/api/filter-logs', methods=['POST'])
 def filter_logs():
-    """
-    Bước cốt lõi của BF Semi-Join tại Site B.
-    
-    Nhận Bloom Filter (dạng bit string) từ Site A,
-    dùng nó để lọc bảng WebLogs cục bộ,
-    chỉ trả về những dòng PASS qua Bloom Filter.
-    
-    Body (JSON):
-        bf_bit_string: str (chuỗi '0'/'1' đại diện bit_array)
-        bf_m: int (kích thước bit array)
-        bf_k: int (số hàm băm)
-        
-    Returns:
-        filtered_logs: list of dicts
-        stats: thống kê lọc
-    """
     try:
         if site_b_data['weblogs_df'] is None:
             return jsonify({'success': False, 'error': 'Site B chưa có dữ liệu WebLogs'}), 400
@@ -191,26 +147,21 @@ def filter_logs():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # KILL — Mô phỏng sập Node B (cho demo)
 # =================================================================
 
 @app.route('/api/kill', methods=['POST'])
 def kill_node():
-    """Mô phỏng Node B bị sập."""
     site_b_data['status'] = 'offline'
     print("[Site B] ❌ Node B đã bị KILL — mô phỏng sập server")
     return jsonify({'status': 'offline', 'message': 'Node B is now offline'})
 
-
 @app.route('/api/recover', methods=['POST'])
 def recover_node():
-    """Mô phỏng Node B khôi phục."""
     site_b_data['status'] = 'online'
     print("[Site B] ✅ Node B đã KHÔI PHỤC — sẵn sàng hoạt động")
     return jsonify({'status': 'online', 'message': 'Node B is back online'})
-
 
 # =================================================================
 # MAIN

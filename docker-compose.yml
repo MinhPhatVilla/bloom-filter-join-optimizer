@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  site-a:
+    build: .
+    container_name: site_a_container
+    ports:
+      - "5000:5000"
+    volumes:
+      - .:/app
+    environment:
+      - SITE_B_URL=http://site-b:5001
+    command: python app.py
+    depends_on:
+      - site-b
+
+  site-b:
+    build: .
+    container_name: site_b_container
+    ports:
+      - "5001:5001"
+    volumes:
+      - .:/app
+    command: python site_b_server.py

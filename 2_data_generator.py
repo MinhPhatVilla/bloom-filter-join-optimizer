@@ -1,61 +1,10 @@
-"""
-==========================================================================
-FILE 2: DATA GENERATOR - Tạo Dữ Liệu Giả Lập Phân Tán
-==========================================================================
-Môn: Cơ Sở Dữ Liệu Phân Tán
-Đề tài: Bloom Filter Join Optimizer - "Subscribers & Logs"
-
-File này tạo dữ liệu cho BÀI TOÁN PHÂN TÁN:
-
-   ┌─────────────────┐                ┌─────────────────────┐
-   │    SITE A        │                │      SITE B          │
-   │  (HQ - Trụ sở)  │    Network     │  (Branch - Chi nhánh)│
-   │                  │◄──────────────►│                      │
-   │  Subscribers     │                │     WebLogs          │
-   │  (Thuê bao)      │                │  (Nhật ký truy cập)  │
-   └─────────────────┘                └─────────────────────┘
-
-Bài toán: JOIN Subscribers với WebLogs theo user_id
-  → Cần tối ưu lượng dữ liệu truyền qua mạng
-  → Dùng Bloom Filter Semi-Join
-
-Đặc điểm dữ liệu:
-  - Subscribers: ÍT hơn (vd: 10,000 người dùng trả phí)
-  - WebLogs: NHIỀU hơn (vd: 50,000 - 100,000 bản ghi)
-  - Overlap: Chỉ ~30-50% WebLogs match với Subscribers
-    → Nếu gửi hết WebLogs qua mạng → LÃNG PHÍ bandwidth
-    → Bloom Filter giúp lọc trước ở Site B
-==========================================================================
-"""
-
 import random
 import string
 import pandas as pd
 from datetime import datetime, timedelta
 
-
 class DataGenerator:
-    """
-    Bộ tạo dữ liệu giả lập cho hệ thống phân tán.
-    
-    Tạo 2 bảng:
-    1. subscribers (Site A): Thông tin người dùng đã đăng ký
-    2. web_logs (Site B): Nhật ký truy cập website
-    
-    Dữ liệu được thiết kế sao cho:
-    - Có MỘT PHẦN web_logs match với subscribers (overlap)
-    - Có NHIỀU web_logs không match (guest/anonymous users)
-    → Mô phỏng thực tế: không phải ai vào web cũng là thuê bao
-    """
-    
     def __init__(self, seed=42):
-        """
-        Khởi tạo DataGenerator với random seed cố định.
-        
-        Parameters:
-            seed (int): Random seed để đảm bảo kết quả reproducible.
-                        Mỗi lần chạy với cùng seed → cùng dữ liệu.
-        """
         self.seed = seed
         random.seed(seed)
         
@@ -112,24 +61,6 @@ class DataGenerator:
     # =================================================================
     
     def generate_subscribers(self, num_subscribers=10000):
-        """
-        Tạo bảng Subscribers cho Site A.
-        
-        Schema:
-        ┌──────────────┬─────────────┬───────────────────┬──────────┬──────────────┐
-        │ user_id (PK) │ full_name   │ email             │ plan     │ monthly_fee  │
-        ├──────────────┼─────────────┼───────────────────┼──────────┼──────────────┤
-        │ USR_00001    │ Nguyễn An   │ an.nguyen@mail... │ Premium  │ 399000       │
-        │ USR_00002    │ Trần Bình   │ binh.tran@mail... │ Basic    │ 99000        │
-        │ ...          │ ...         │ ...               │ ...      │ ...          │
-        └──────────────┴─────────────┴───────────────────┴──────────┴──────────────┘
-        
-        Parameters:
-            num_subscribers (int): Số lượng thuê bao cần tạo
-            
-        Returns:
-            pd.DataFrame: Bảng Subscribers
-        """
         print(f"\n[DataGenerator] Đang tạo {num_subscribers:,} Subscribers...")
         
         subscribers = []
@@ -187,36 +118,6 @@ class DataGenerator:
     def generate_web_logs(self, num_logs=50000, 
                           subscriber_ids=None, 
                           overlap_ratio=0.35):
-        """
-        Tạo bảng WebLogs cho Site B.
-        
-        Thiết kế dữ liệu:
-        - overlap_ratio (vd: 0.35 = 35%): Tỷ lệ logs thuộc về subscribers
-        - 1 - overlap_ratio (65%): Logs từ guest users (không phải thuê bao)
-        
-        Ý nghĩa trong thực tế:
-        → Website có cả khách vãng lai (guest) lẫn thuê bao (subscriber)
-        → Khi JOIN, ta chỉ cần logs của subscribers
-        → 65% logs là DƯ THỪA nếu gửi qua mạng
-        → Bloom Filter giúp LỌC BỎ 65% dư thừa này TẠI Site B
-        
-        Schema:
-        ┌────────────┬──────────────┬─────────┬────────┬────────┬────────────┐
-        │ log_id(PK) │ user_id (FK) │ page    │ method │ status │ timestamp  │
-        ├────────────┼──────────────┼─────────┼────────┼────────┼────────────┤
-        │ LOG_000001 │ USR_00042    │ /home   │ GET    │ 200    │ 2026-01... │
-        │ LOG_000002 │ GUEST_00531  │ /about  │ GET    │ 200    │ 2026-01... │
-        │ ...        │ ...          │ ...     │ ...    │ ...    │ ...        │
-        └────────────┴──────────────┴─────────┴────────┴────────┴────────────┘
-        
-        Parameters:
-            num_logs (int): Tổng số bản ghi log cần tạo
-            subscriber_ids (list): Danh sách user_id của subscribers (từ Site A)
-            overlap_ratio (float): Tỷ lệ logs match với subscribers (0.0 - 1.0)
-            
-        Returns:
-            pd.DataFrame: Bảng WebLogs
-        """
         print(f"\n[DataGenerator] Đang tạo {num_logs:,} WebLogs "
               f"(overlap = {overlap_ratio:.0%})...")
         
@@ -278,16 +179,6 @@ class DataGenerator:
         return df
     
     def _create_log_entry(self, log_id, user_id):
-        """
-        Tạo một bản ghi log đơn lẻ.
-        
-        Parameters:
-            log_id (str): ID của bản ghi
-            user_id (str): ID người dùng (subscriber hoặc guest)
-            
-        Returns:
-            dict: Một bản ghi log
-        """
         # Chọn trang, method, status theo phân bổ thực tế
         page = random.choice(self.pages)
         method = random.choices(
@@ -329,21 +220,6 @@ class DataGenerator:
     # =================================================================
     
     def analyze_data(self, subscribers_df, logs_df):
-        """
-        Phân tích chi tiết dữ liệu hai site.
-        
-        Tính toán:
-        - Actual overlap: Bao nhiêu log thực sự match
-        - Bandwidth waste: Bao nhiêu dữ liệu lãng phí nếu gửi hết
-        - Potential savings: Bloom Filter có thể tiết kiệm bao nhiêu
-        
-        Parameters:
-            subscribers_df: DataFrame Subscribers (Site A)
-            logs_df: DataFrame WebLogs (Site B)
-            
-        Returns:
-            dict: Kết quả phân tích
-        """
         print(f"\n{'='*60}")
         print(f"  📊 PHÂN TÍCH DỮ LIỆU PHÂN TÁN")
         print(f"{'='*60}")
@@ -428,23 +304,6 @@ class DataGenerator:
     
     def generate_scenario(self, scenario_name, 
                           num_subscribers, num_logs, overlap_ratio):
-        """
-        Tạo một kịch bản dữ liệu hoàn chỉnh.
-        
-        Mỗi kịch bản bao gồm:
-        1. Bảng Subscribers (Site A)
-        2. Bảng WebLogs (Site B) với overlap_ratio đã định
-        3. Phân tích chi tiết
-        
-        Parameters:
-            scenario_name (str): Tên kịch bản (để hiển thị)
-            num_subscribers (int): Số subscribers
-            num_logs (int): Số web logs
-            overlap_ratio (float): Tỷ lệ logs match (0.0 - 1.0)
-            
-        Returns:
-            tuple: (subscribers_df, logs_df, analysis)
-        """
         print(f"\n{'#'*65}")
         print(f"  KỊCH BẢN: {scenario_name}")
         print(f"  Subscribers: {num_subscribers:,} | "
@@ -466,7 +325,6 @@ class DataGenerator:
         analysis = self.analyze_data(subscribers_df, logs_df)
         
         return subscribers_df, logs_df, analysis
-
 
 # =================================================================
 # DEMO: Tạo và phân tích dữ liệu

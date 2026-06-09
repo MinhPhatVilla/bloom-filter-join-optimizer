@@ -1,63 +1,10 @@
-"""
-==========================================================================
-FILE 1: BLOOM FILTER - Cài đặt từ Scratch
-==========================================================================
-Môn: Cơ Sở Dữ Liệu Phân Tán
-Đề tài: Bloom Filter Join Optimizer - "Subscribers & Logs"
-
-Bloom Filter là cấu trúc dữ liệu XÁC SUẤT (probabilistic data structure)
-dùng để kiểm tra "phần tử có thuộc tập hợp hay không" một cách NHANH và
-TIẾT KIỆM BỘ NHỚ.
-
-Đặc điểm quan trọng:
-  - FALSE NEGATIVE = 0% → Không bao giờ bỏ sót phần tử thực sự có
-  - FALSE POSITIVE > 0% → Có thể nhầm phần tử không có thành có
-  
-Ứng dụng trong CSDL phân tán:
-  Site A tạo Bloom Filter từ UserIDs → gửi sang Site B
-  Site B lọc WebLogs qua Bloom Filter → chỉ gửi rows match về Site A
-  → Tiết kiệm bandwidth truyền tải dữ liệu giữa các site
-==========================================================================
-"""
-
 import math
 import mmh3  # MurmurHash3 - hàm băm nhanh, phân bố đều (thư viện hash, KHÔNG phải thư viện Bloom Filter)
 from bitarray import bitarray  # Mảng bit hiệu quả về bộ nhớ
 
-
 class BloomFilter:
-    """
-    Bloom Filter cài đặt từ scratch.
-    
-    Cấu trúc bên trong:
-    ┌───┬───┬───┬───┬───┬───┬───┬───┬───┬───┐
-    │ 0 │ 0 │ 1 │ 0 │ 1 │ 0 │ 0 │ 1 │ 0 │ 0 │  ← bit array (m bits)
-    └───┴───┴───┴───┴───┴───┴───┴───┴───┴───┘
-    
-    Hai cách khởi tạo:
-    1. Chỉ định trực tiếp m (kích thước bit array) và k (số hàm băm)
-    2. Chỉ định n (số phần tử) và fp_rate (tỷ lệ false positive mong muốn)
-       → Tự động tính m và k tối ưu
-    """
-    
     def __init__(self, size_m=None, num_hashes_k=None, 
                  expected_items_n=None, fp_rate=None):
-        """
-        Khởi tạo Bloom Filter.
-        
-        Parameters:
-        -----------
-        size_m : int, optional
-            Kích thước bit array (số bits). Dùng khi muốn chỉ định trực tiếp.
-        num_hashes_k : int, optional
-            Số hàm băm. Dùng khi muốn chỉ định trực tiếp.
-        expected_items_n : int, optional
-            Số phần tử dự kiến sẽ insert. Dùng để tính m, k tối ưu.
-        fp_rate : float, optional
-            Tỷ lệ false positive mong muốn (ví dụ: 0.01 = 1%). 
-            Dùng cùng expected_items_n để tính m, k tối ưu.
-        """
-        
         if expected_items_n is not None and fp_rate is not None:
             # =============================================
             # CÁCH 1: Tự động tính m và k từ n và fp_rate
@@ -108,49 +55,11 @@ class BloomFilter:
     
     @staticmethod
     def _optimal_size(n, fp_rate):
-        """
-        Tính kích thước bit array tối ưu.
-        
-        Công thức: m = -(n * ln(fp_rate)) / (ln2)^2
-        
-        Chứng minh:
-        - FPR ≈ (1 - e^(-kn/m))^k
-        - Với k = (m/n) * ln2, FPR được tối thiểu hoá
-        - Giải phương trình FPR = p, ta được m = -(n * ln(p)) / (ln2)^2
-        
-        Parameters:
-            n: Số phần tử dự kiến
-            fp_rate: Tỷ lệ false positive mong muốn
-            
-        Returns:
-            int: Kích thước bit array tối ưu (m)
-        """
         m = -(n * math.log(fp_rate)) / (math.log(2) ** 2)
         return int(math.ceil(m))  # Làm tròn lên
     
     @staticmethod
     def _optimal_hash_count(m, n):
-        """
-        Tính số hàm băm tối ưu.
-        
-        Công thức: k = (m/n) * ln(2) ≈ 0.693 * (m/n)
-        
-        Chứng minh:
-        - Để minimize FPR, ta lấy đạo hàm FPR theo k và cho = 0
-        - Kết quả: k_opt = (m/n) * ln(2)
-        
-        Trực giác: 
-        - k quá nhỏ → ít bit được set → chưa tận dụng hết bit array
-        - k quá lớn → quá nhiều bit được set → tăng collision → tăng FPR
-        - k tối ưu → cân bằng giữa hai thái cực
-        
-        Parameters:
-            m: Kích thước bit array
-            n: Số phần tử dự kiến
-            
-        Returns:
-            int: Số hàm băm tối ưu (k)
-        """
         k = (m / n) * math.log(2)
         return int(round(k))  # Làm tròn
     
@@ -159,31 +68,6 @@ class BloomFilter:
     # =================================================================
     
     def _get_hash_values(self, item):
-        """
-        Tính k giá trị hash cho một phần tử.
-        
-        Kỹ thuật: Double Hashing
-        ========================
-        Thay vì dùng k hàm băm độc lập (tốn tài nguyên),
-        ta dùng kỹ thuật Double Hashing:
-        
-            h_i(x) = (h1(x) + i * h2(x)) % m
-        
-        Trong đó:
-        - h1(x) = MurmurHash3 với seed = 0
-        - h2(x) = MurmurHash3 với seed = 1  
-        - i = 0, 1, 2, ..., k-1
-        
-        Bài báo chứng minh: Kirsch & Mitzenmacher (2006)
-        "Less Hashing, Same Performance" → Double Hashing cho kết quả
-        tương đương k hàm băm độc lập.
-        
-        Parameters:
-            item: Phần tử cần hash (sẽ được chuyển thành string)
-            
-        Returns:
-            list[int]: Danh sách k vị trí trong bit array
-        """
         item_str = str(item)
         
         # Hai hàm băm cơ sở
@@ -206,51 +90,12 @@ class BloomFilter:
     # =================================================================
     
     def insert(self, item):
-        """
-        Thêm một phần tử vào Bloom Filter.
-        
-        Quy trình:
-        1. Tính k vị trí hash: h₁(item), h₂(item), ..., hₖ(item)
-        2. Set các bit tại các vị trí đó = 1
-        
-        Ví dụ với m=16, k=3:
-        ┌──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┐
-        │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │0 │ Trước
-        └──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┘
-                  ↓ insert("user_123") → h1=2, h2=7, h3=13
-        ┌──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┬──┐
-        │0 │0 │1 │0 │0 │0 │0 │1 │0 │0 │0 │0 │0 │1 │0 │0 │ Sau
-        └──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┴──┘
-              ↑                 ↑                    ↑
-              
-        Parameters:
-            item: Phần tử cần thêm
-        """
         positions = self._get_hash_values(item)
         for pos in positions:
             self.bit_array[pos] = 1
         self.items_inserted += 1
     
     def lookup(self, item):
-        """
-        Kiểm tra phần tử có trong Bloom Filter không.
-        
-        Quy trình:
-        1. Tính k vị trí hash
-        2. Kiểm tra tất cả bit tại các vị trí đó
-        
-        Kết quả:
-        - Nếu TẤT CẢ bit = 1 → "CÓ THỂ CÓ" (Maybe Yes)
-          → Phần tử có thể trong tập hợp (hoặc là False Positive)
-        - Nếu BẤT KỲ bit = 0 → "CHẮC CHẮN KHÔNG" (Definitely No)
-          → Phần tử chắc chắn không trong tập hợp
-        
-        Parameters:
-            item: Phần tử cần kiểm tra
-            
-        Returns:
-            bool: True = "có thể có", False = "chắc chắn không"
-        """
         positions = self._get_hash_values(item)
         for pos in positions:
             if self.bit_array[pos] == 0:
@@ -262,15 +107,6 @@ class BloomFilter:
     # =================================================================
     
     def bulk_insert(self, items):
-        """
-        Insert nhiều phần tử cùng lúc.
-        
-        Parameters:
-            items: Iterable các phần tử cần insert
-            
-        Returns:
-            int: Số phần tử đã insert
-        """
         count = 0
         for item in items:
             self.insert(item)
@@ -278,15 +114,6 @@ class BloomFilter:
         return count
     
     def bulk_lookup(self, items):
-        """
-        Lookup nhiều phần tử, trả về danh sách kết quả.
-        
-        Parameters:
-            items: Iterable các phần tử cần kiểm tra
-            
-        Returns:
-            tuple: (matches, non_matches) - hai danh sách phần tử
-        """
         matches = []      # Phần tử "có thể có" trong BF
         non_matches = []   # Phần tử "chắc chắn không có"
         
@@ -303,34 +130,10 @@ class BloomFilter:
     # =================================================================
     
     def get_fill_ratio(self):
-        """
-        Tính tỷ lệ bit đã được set = 1 (fill ratio).
-        
-        Fill ratio cho biết Bloom Filter "đầy" đến mức nào:
-        - Fill ratio thấp → ít collision → FPR thấp
-        - Fill ratio cao → nhiều collision → FPR cao
-        - Fill ratio = 50% → tối ưu (khi k = k_opt)
-        
-        Returns:
-            float: Tỷ lệ bit = 1 (0.0 đến 1.0)
-        """
         bits_set = self.bit_array.count(1)
         return bits_set / self.m
     
     def get_theoretical_fpr(self):
-        """
-        Tính tỷ lệ False Positive THEO LÝ THUYẾT.
-        
-        Công thức: FPR = (1 - e^(-kn/m))^k
-        
-        Giải thích từng phần:
-        - e^(-kn/m): Xác suất một bit cụ thể vẫn = 0 sau khi insert n phần tử
-        - (1 - e^(-kn/m)): Xác suất một bit cụ thể = 1
-        - (...)^k: Xác suất cả k bit đều = 1 (giả sử độc lập)
-        
-        Returns:
-            float: FPR lý thuyết (0.0 đến 1.0)
-        """
         if self.items_inserted == 0:
             return 0.0
         
@@ -341,19 +144,6 @@ class BloomFilter:
         return fpr
     
     def get_empirical_fpr(self, test_items, true_items_set):
-        """
-        Tính tỷ lệ False Positive THỰC TẾ bằng cách đo.
-        
-        So sánh kết quả Bloom Filter với tập hợp thực tế:
-        - Nếu BF nói "có" nhưng thực tế "không có" → False Positive
-        
-        Parameters:
-            test_items: Danh sách phần tử cần kiểm tra
-            true_items_set: Set chứa các phần tử THỰC SỰ có
-            
-        Returns:
-            dict: Thống kê chi tiết FP, TP, TN, FN
-        """
         true_positives = 0   # BF nói "có", thực tế CÓ
         false_positives = 0  # BF nói "có", thực tế KHÔNG → Sai!
         true_negatives = 0   # BF nói "không", thực tế KHÔNG
@@ -386,24 +176,9 @@ class BloomFilter:
         }
     
     def get_size_bytes(self):
-        """
-        Trả về kích thước thực tế của Bloom Filter tính bằng bytes.
-        
-        Đây là kích thước dữ liệu cần truyền qua mạng trong 
-        bài toán Semi-Join phân tán.
-        
-        Returns:
-            int: Kích thước tính bằng bytes
-        """
         return math.ceil(self.m / 8)
     
     def get_stats(self):
-        """
-        Trả về tất cả thông số thống kê của Bloom Filter.
-        
-        Returns:
-            dict: Thống kê đầy đủ
-        """
         return {
             'size_bits': self.m,
             'size_bytes': self.get_size_bytes(),
@@ -417,14 +192,12 @@ class BloomFilter:
         }
     
     def __repr__(self):
-        """Hiển thị thông tin Bloom Filter."""
         return (
             f"BloomFilter(m={self.m:,}, k={self.k}, "
             f"items={self.items_inserted:,}, "
             f"fill={self.get_fill_ratio():.2%}, "
             f"FPR={self.get_theoretical_fpr():.4%})"
         )
-
 
 # =================================================================
 # DEMO: Kiểm tra Bloom Filter hoạt động đúng
