@@ -1,16 +1,5 @@
-"""
-==========================================================================
-WEB APP: Flask Backend cho Bloom Filter Join Optimizer Dashboard
-==========================================================================
-Cung cấp API endpoints để frontend gọi và nhận kết quả JSON.
-
-Cách chạy:
-    python app.py
-    → Mở trình duyệt: http://localhost:5000
-==========================================================================
-"""
-
 import sys
+import os
 import io
 import json
 import math
@@ -41,7 +30,6 @@ DistributedJoinSimulator = semijoin_mod.DistributedJoinSimulator
 
 app = Flask(__name__)
 
-
 # =================================================================
 # ROUTE: Trang chính
 # =================================================================
@@ -50,22 +38,12 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
-
 # =================================================================
 # API: Chạy mô phỏng đầy đủ
 # =================================================================
 
 @app.route('/api/run-simulation', methods=['POST'])
 def run_simulation():
-    """
-    Chạy toàn bộ pipeline Bloom Filter Semi-Join và trả về JSON.
-    
-    Body params (JSON):
-        num_subscribers: int (default 10000)
-        num_logs: int (default 50000)
-        overlap_ratio: float (default 0.20)
-        node_b_online: bool (default True)
-    """
     try:
         data = request.get_json() or {}
         num_subscribers = int(data.get('num_subscribers', 10000))
@@ -167,17 +145,12 @@ def run_simulation():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # API: Tính toán lý thuyết (nhanh, không cần tạo data)
 # =================================================================
 
 @app.route('/api/theoretical', methods=['POST'])
 def theoretical_analysis():
-    """
-    Tính toán lý thuyết cho quy mô bất kỳ bằng công thức BF.
-    Không cần tạo dữ liệu thực → phản hồi tức thì.
-    """
     try:
         data = request.get_json() or {}
         n_subs = int(data.get('num_subscribers', 1_000_000))
@@ -227,16 +200,12 @@ def theoretical_analysis():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # API: Demo Bloom Filter đơn giản
 # =================================================================
 
 @app.route('/api/bloom-filter-demo', methods=['POST'])
 def bloom_filter_demo():
-    """
-    Demo nhanh Bloom Filter: insert + lookup + FPR.
-    """
     try:
         data = request.get_json() or {}
         n = int(data.get('num_items', 1000))
@@ -282,14 +251,12 @@ def bloom_filter_demo():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # API: Dữ liệu cho biểu đồ BF size
 # =================================================================
 
 @app.route('/api/bf-size-data')
 def bf_size_data():
-    """Trả về dữ liệu BF size theo n và FPR cho biểu đồ."""
     import numpy as np
     
     n_values = list(range(1000, 1_000_001, 10000))
@@ -308,24 +275,12 @@ def bf_size_data():
         'datasets': datasets
     })
 
-
 # =================================================================
 # API: Phân tích điểm gãy Break-even Point
 # =================================================================
 
 @app.route('/api/breakeven-analysis', methods=['POST'])
 def breakeven_analysis():
-    """
-    Tính toán điểm gãy (Break-even Point) của BF Semi-Join so với Naive Join.
-
-    Tìm ngưỡng kích thước m (bits) mà tại đó BF Semi-Join bắt đầu
-    có chi phí mạng thấp hơn Naive Join.
-
-    Body params (JSON):
-        num_subscribers: int
-        num_logs: int
-        overlap_ratio: float
-    """
     try:
         data = request.get_json() or {}
         n_subs = int(data.get('num_subscribers', 10000))
@@ -425,27 +380,15 @@ def breakeven_analysis():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # API: MÔ PHỎNG PHÂN TÁN THẬT SỰ (2 processes qua HTTP)
 # =================================================================
 
 @app.route('/api/run-distributed', methods=['POST'])
 def run_distributed():
-    """
-    Thực thi BF Semi-Join qua 2 Flask processes thật sự:
-      Site A (port 5000) ↔ Site B (port 5001)
-    
-    Pipeline:
-      1. Site A tạo dữ liệu → gửi WebLogs sang Site B qua HTTP
-      2. Site A tạo Bloom Filter từ Subscribers
-      3. Site A serialize BF bit_array → gửi sang Site B qua HTTP
-      4. Site B nhận BF, lọc WebLogs cục bộ → trả filtered logs về Site A
-      5. Site A thực hiện Inner Join cuối cùng
-    """
     import requests as http_client
     
-    SITE_B_URL = 'http://localhost:5001'
+    SITE_B_URL = os.environ.get('SITE_B_URL', 'http://localhost:5001')
     
     try:
         data = request.get_json() or {}
@@ -615,17 +558,12 @@ def run_distributed():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # API: Sensitivity Analysis (Phân tích độ nhạy tham số)
 # =================================================================
 
 @app.route('/api/sensitivity-analysis', methods=['POST'])
 def sensitivity_analysis():
-    """
-    Phân tích ảnh hưởng của Overlap Ratio (5% → 90%) lên hiệu quả BF.
-    Tính toán hoàn toàn bằng công thức lý thuyết → phản hồi tức thì.
-    """
     try:
         data = request.get_json() or {}
         n_subs = int(data.get('num_subscribers', 10000))
@@ -685,7 +623,6 @@ def sensitivity_analysis():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 # =================================================================
 # MAIN
 # =================================================================
@@ -697,5 +634,4 @@ if __name__ == '__main__':
     print("  [Ưu tiên 2] Chế độ phân tán: chạy thêm site_b_server.py")
     print("=" * 60 + "\n")
     app.run(debug=True, port=5000)
-
 

@@ -1,36 +1,3 @@
-"""
-==========================================================================
-FILE 3: SEMI-JOIN OPTIMIZER - Thuật Toán Tối Ưu Bằng Bloom Filter
-==========================================================================
-Môn: Cơ Sở Dữ Liệu Phân Tán
-Đề tài: Bloom Filter Join Optimizer - "Subscribers & Logs"
-
-File này mô phỏng quá trình thực thi truy vấn (Query Execution) trong 
-môi trường phân tán.
-
-Yêu cầu (Query):
-  SELECT S.full_name, S.plan, W.page, W.timestamp
-  FROM Subscribers S
-  JOIN WebLogs W ON S.user_id = W.user_id
-
-Hai chiến lược thực thi được so sánh:
-1. NAIVE JOIN (Join Truyền Thống):
-   - Chuyển toàn bộ dữ liệu WebLogs từ Site B sang Site A.
-   - Thực hiện Join tại Site A.
-
-2. BLOOM FILTER SEMI-JOIN (Join Tối Ưu):
-   - Bước 1: Site A tạo Bloom Filter chứa user_id, gửi sang Site B.
-   - Bước 2: Site B dùng Bloom Filter lọc bảng WebLogs.
-   - Bước 3: Site B chỉ gửi những dòng WebLogs lọt qua màng lọc sang Site A.
-   - Bước 4: Site A nhận dữ liệu và thực hiện Join cuối cùng.
-
-Đo lường:
-  - Lượng dữ liệu truyền tải (Network Bandwidth)
-  - Số bản ghi xử lý (Processing Cost)
-  - Ảnh hưởng của False Positive
-==========================================================================
-"""
-
 import time
 import pandas as pd
 import importlib
@@ -43,18 +10,7 @@ data_generator_mod = importlib.import_module("2_data_generator")
 DataGenerator = data_generator_mod.DataGenerator
 
 class DistributedJoinSimulator:
-    """
-    Trình mô phỏng quá trình Join giữa 2 site phân tán.
-    """
-    
     def __init__(self, subscribers_df, weblogs_df):
-        """
-        Khởi tạo simulator.
-        
-        Parameters:
-            subscribers_df: DataFrame chứa thông tin thuê bao (ở Site A)
-            weblogs_df: DataFrame chứa log truy cập (ở Site B)
-        """
         self.site_a_data = subscribers_df
         self.site_b_data = weblogs_df
         
@@ -67,17 +23,6 @@ class DistributedJoinSimulator:
     # =================================================================
     
     def run_naive_join(self):
-        """
-        Thực hiện chiến lược Naive Join (Gửi toàn bộ).
-        
-        Mô phỏng:
-        1. Site B lấy toàn bộ WebLogs
-        2. Truyền qua mạng (tính toán số bytes)
-        3. Site A nhận và thực hiện Merge (Join)
-        
-        Returns:
-            dict: Thống kê kết quả
-        """
         print("\n[Chiến lược 1] Đang thực thi NAIVE JOIN (Gửi toàn bộ)...")
         start_time = time.time()
         
@@ -113,22 +58,6 @@ class DistributedJoinSimulator:
     # =================================================================
     
     def run_bloom_filter_semi_join(self, fpr_target=0.01):
-        """
-        Thực hiện chiến lược Semi-Join tối ưu bằng Bloom Filter.
-        
-        Mô phỏng:
-        1. Site A: Quét danh sách user_id, tạo Bloom Filter
-        2. Mạng: Truyền BF từ Site A -> Site B (Tính cost)
-        3. Site B: Lọc WebLogs qua BF, loại bỏ các dòng chắc chắn KHÔNG phải của Site A
-        4. Mạng: Truyền tập WebLogs đã lọc từ Site B -> Site A (Tính cost)
-        5. Site A: Thực hiện Join cuối cùng để loại bỏ False Positive và lấy kết quả
-        
-        Parameters:
-            fpr_target (float): Tỷ lệ False Positive mong muốn cho BF
-            
-        Returns:
-            dict: Thống kê kết quả
-        """
         print(f"\n[Chiến lược 2] Đang thực thi BF SEMI-JOIN (FPR = {fpr_target*100:.1f}%)...")
         start_time = time.time()
         
@@ -216,11 +145,6 @@ class DistributedJoinSimulator:
     # =================================================================
     
     def compare_strategies(self):
-        """
-        Chạy đầy đủ tất cả chiến lược và in báo cáo đúng theo yêu cầu đề bài:
-          - Bytes saved vs. the size of the bit-vector (m bits)
-          - FPR impact on wasted bandwidth
-        """
         print(f"\n{'='*72}")
         print(f"  BAT DAU MO PHONG THUC THI TRUY VAN PHAN TAN")
         print(f"{'='*72}")

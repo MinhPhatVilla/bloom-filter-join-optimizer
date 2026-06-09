@@ -1,18 +1,3 @@
-"""
-==========================================================================
-FILE 4: VISUALIZATION - Trực Quan Hóa Kết Quả
-==========================================================================
-Môn: Cơ Sở Dữ Liệu Phân Tán
-Đề tài: Bloom Filter Join Optimizer - "Subscribers & Logs"
-
-File này vẽ các biểu đồ trực quan để minh họa:
-  1. So sánh Bandwidth: Naive Join vs BF Semi-Join
-  2. Tỷ lệ False Positive lý thuyết vs thực tế theo FPR
-  3. Ảnh hưởng của Overlap Ratio đến hiệu quả tiết kiệm
-  4. Kích thước Bloom Filter theo số phần tử và FPR
-==========================================================================
-"""
-
 import math
 import importlib
 import numpy as np
@@ -24,13 +9,11 @@ from matplotlib.gridspec import GridSpec
 bloom_mod = importlib.import_module("1_bloom_filter")
 BloomFilter = bloom_mod.BloomFilter
 
-
 # =================================================================
 # CẤU HÌNH STYLE CHUNG (Dark Theme cho đẹp)
 # =================================================================
 
 def setup_style():
-    """Cấu hình style chung cho tất cả biểu đồ."""
     plt.rcParams.update({
         'figure.facecolor': '#1e1e2e',
         'axes.facecolor': '#2a2a3e',
@@ -56,19 +39,11 @@ COLORS = {
     'waste':   '#f38ba8',   # Đỏ       - Lãng phí
 }
 
-
 # =================================================================
 # BIỂU ĐỒ 1: So Sánh Bandwidth Các Chiến Lược
 # =================================================================
 
 def plot_bandwidth_comparison(benchmark_results, ax):
-    """
-    Vẽ biểu đồ cột so sánh lượng dữ liệu truyền qua mạng (KB).
-    
-    Parameters:
-        benchmark_results: list kết quả từ DistributedJoinSimulator
-        ax: Matplotlib Axes object
-    """
     strategies = [r['strategy'] for r in benchmark_results]
     bandwidths  = [r['network_bytes'] / 1024 for r in benchmark_results]  # → KB
     
@@ -107,19 +82,11 @@ def plot_bandwidth_comparison(benchmark_results, ax):
     ax.grid(axis='y', linestyle='--')
     ax.set_ylim(0, max(bandwidths) * 1.18)
 
-
 # =================================================================
 # BIỂU ĐỒ 2: FPR Lý Thuyết vs Thực Tế
 # =================================================================
 
 def plot_fpr_theory_vs_actual(benchmark_results, ax):
-    """
-    Vẽ biểu đồ đường so sánh FPR lý thuyết và False Positive thực đo được.
-    
-    Parameters:
-        benchmark_results: list kết quả (bỏ qua Naive - index 0)
-        ax: Matplotlib Axes object
-    """
     # Lọc bỏ kết quả Naive Join
     bf_results = [r for r in benchmark_results if 'BF' in r['strategy']]
 
@@ -154,18 +121,11 @@ def plot_fpr_theory_vs_actual(benchmark_results, ax):
     ax.legend(fontsize=9)
     ax.grid(linestyle='--')
 
-
 # =================================================================
 # BIỂU ĐỒ 3: Ảnh Hưởng của Overlap Ratio
 # =================================================================
 
 def plot_overlap_impact(ax):
-    """
-    Vẽ biểu đồ diện tích chồng chất: tỷ lệ match vs waste theo overlap.
-    
-    Parameters:
-        ax: Matplotlib Axes object
-    """
     overlap_ratios = np.linspace(0.05, 0.95, 50)
     match_pct = overlap_ratios * 100
     waste_pct = (1 - overlap_ratios) * 100
@@ -187,18 +147,11 @@ def plot_overlap_impact(ax):
     ax.set_ylim(0, 100)
     ax.grid(linestyle='--')
 
-
 # =================================================================
 # BIỂU ĐỒ 4: Kích Thước Bloom Filter theo n và FPR
 # =================================================================
 
 def plot_bf_size(ax):
-    """
-    Vẽ biểu đồ kích thước BF (MB) theo số phần tử n với nhiều mức FPR.
-    
-    Parameters:
-        ax: Matplotlib Axes object
-    """
     n_values = np.linspace(1000, 1_000_000, 200)
     fpr_list = [0.10, 0.05, 0.01, 0.001]
     line_colors = [COLORS['bf_10'], COLORS['bf_5'], COLORS['bf_1'], COLORS['bf_01']]
@@ -218,18 +171,11 @@ def plot_bf_size(ax):
     ax.legend(fontsize=9)
     ax.grid(linestyle='--')
 
-
 # =================================================================
 # HÀM CHÍNH: Vẽ Dashboard Tổng Hợp
 # =================================================================
 
 def draw_full_dashboard(benchmark_results):
-    """
-    Vẽ toàn bộ dashboard 2x2 gồm 4 biểu đồ và lưu ảnh.
-    
-    Parameters:
-        benchmark_results: list kết quả từ DistributedJoinSimulator.compare_strategies()
-    """
     setup_style()
 
     fig = plt.figure(figsize=(18, 11))
@@ -254,7 +200,6 @@ def draw_full_dashboard(benchmark_results):
                 facecolor=fig.get_facecolor())
     print(f'\n  ✅ Dashboard đã lưu tại: {output_path}')
     plt.show()
-
 
 # =================================================================
 # DEMO NHANH (chạy độc lập không cần File 3)
